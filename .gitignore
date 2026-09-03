@@ -1,0 +1,46 @@
+# Maven
+target/
+!.mvn/wrapper/maven-wrapper.jar
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database
+data/postgres/
+*.db
+
+# Environment
+.env
+.env.local
+
+# Build artifacts
+*.class
+*.log
+
+# Spring Boot
+spring.log
+
+# Temporary files
+*.tmp
+*.swp
+*~

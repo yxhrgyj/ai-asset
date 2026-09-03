@@ -27,6 +27,7 @@ Thumbs.db
 
 # Database
 data/postgres/
+data/asset-files/
 *.db
 
 # Environment

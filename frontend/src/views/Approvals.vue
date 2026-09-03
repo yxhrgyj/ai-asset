@@ -1,108 +1,111 @@
 <template>
-  <div class="approvals-page">
-    <div class="page-header">
-      <h1 class="page-title">审批管理</h1>
-    </div>
+  <MainLayout>
+    <div class="approvals-page">
+      <div class="page-header">
+        <h1 class="page-title">审批管理</h1>
+      </div>
 
-    <div v-if="loading" class="loading">加载中...</div>
+      <div v-if="loading" class="loading">加载中...</div>
 
-    <div v-else-if="error" class="error-message">{{ error }}</div>
+      <div v-else-if="error" class="error-message">{{ error }}</div>
 
-    <div v-else-if="approvals.length === 0" class="empty-state">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-      </svg>
-      <p>暂无待审批的资产</p>
-    </div>
+      <div v-else-if="approvals.length === 0" class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <p>暂无待审批的资产</p>
+      </div>
 
-    <div v-else class="approvals-list">
-      <div v-for="approval in approvals" :key="approval.id" class="approval-card">
-        <div class="approval-header">
-          <router-link
-            :to="`/assets/${approval.assetId}`"
-            class="asset-link"
-          >
-            <h3>{{ approval.assetName }}</h3>
-            <span class="version-badge">v{{ approval.versionNo }}</span>
-          </router-link>
-        </div>
-
-        <div class="approval-meta">
-          <div class="meta-item">
-            <span class="label">提交人：</span>
-            <span class="value">{{ approval.submittedByName }}</span>
+      <div v-else class="approvals-list">
+        <div v-for="approval in approvals" :key="approval.id" class="approval-card">
+          <div class="approval-header">
+            <router-link
+              :to="`/assets/${approval.assetId}`"
+              class="asset-link"
+            >
+              <h3>{{ approval.assetName }}</h3>
+              <span class="version-badge">v{{ approval.versionNo }}</span>
+            </router-link>
           </div>
-          <div class="meta-item">
-            <span class="label">提交时间：</span>
-            <span class="value">{{ formatDate(approval.submittedAt) }}</span>
+
+          <div class="approval-meta">
+            <div class="meta-item">
+              <span class="label">提交人：</span>
+              <span class="value">{{ approval.submittedByName }}</span>
+            </div>
+            <div class="meta-item">
+              <span class="label">提交时间：</span>
+              <span class="value">{{ formatDate(approval.submittedAt) }}</span>
+            </div>
+          </div>
+
+          <div class="approval-actions">
+            <button @click="handleApprove(approval)" class="btn-approve">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M5 13l4 4L19 7"/>
+              </svg>
+              批准
+            </button>
+            <button @click="handleReject(approval)" class="btn-reject">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+              驳回
+            </button>
           </div>
         </div>
+      </div>
 
-        <div class="approval-actions">
-          <button @click="handleApprove(approval)" class="btn-approve">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M5 13l4 4L19 7"/>
-            </svg>
-            批准
-          </button>
-          <button @click="handleReject(approval)" class="btn-reject">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M6 18L18 6M6 6l12 12"/>
-            </svg>
-            驳回
-          </button>
+      <!-- 审批对话框 -->
+      <div v-if="showDialog" class="modal-overlay" @click.self="closeDialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2>{{ dialogType === 'approve' ? '批准资产' : '驳回资产' }}</h2>
+            <button @click="closeDialog" class="btn-close">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+
+          <div class="modal-body">
+            <div class="asset-info">
+              <p><strong>资产名称：</strong>{{ currentApproval?.assetName }}</p>
+              <p><strong>版本号：</strong>v{{ currentApproval?.versionNo }}</p>
+              <p><strong>提交人：</strong>{{ currentApproval?.submittedByName }}</p>
+            </div>
+
+            <div class="form-group">
+              <label for="comment">{{ dialogType === 'approve' ? '批准意见' : '驳回理由' }}：</label>
+              <textarea
+                id="comment"
+                v-model="comment"
+                :placeholder="dialogType === 'approve' ? '可选填写批准意见...' : '请说明驳回理由...'"
+                rows="4"
+              ></textarea>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button @click="closeDialog" class="btn-secondary">取消</button>
+            <button
+              @click="confirmDecision"
+              :class="dialogType === 'approve' ? 'btn-approve' : 'btn-reject'"
+              :disabled="submitting"
+            >
+              {{ submitting ? '处理中...' : (dialogType === 'approve' ? '确认批准' : '确认驳回') }}
+            </button>
+          </div>
         </div>
       </div>
     </div>
-
-    <!-- 审批对话框 -->
-    <div v-if="showDialog" class="modal-overlay" @click.self="closeDialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2>{{ dialogType === 'approve' ? '批准资产' : '驳回资产' }}</h2>
-          <button @click="closeDialog" class="btn-close">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M6 18L18 6M6 6l12 12"/>
-            </svg>
-          </button>
-        </div>
-
-        <div class="modal-body">
-          <div class="asset-info">
-            <p><strong>资产名称：</strong>{{ currentApproval?.assetName }}</p>
-            <p><strong>版本号：</strong>v{{ currentApproval?.versionNo }}</p>
-            <p><strong>提交人：</strong>{{ currentApproval?.submittedByName }}</p>
-          </div>
-
-          <div class="form-group">
-            <label for="comment">{{ dialogType === 'approve' ? '批准意见' : '驳回理由' }}：</label>
-            <textarea
-              id="comment"
-              v-model="comment"
-              :placeholder="dialogType === 'approve' ? '可选填写批准意见...' : '请说明驳回理由...'"
-              rows="4"
-            ></textarea>
-          </div>
-        </div>
-
-        <div class="modal-footer">
-          <button @click="closeDialog" class="btn-secondary">取消</button>
-          <button
-            @click="confirmDecision"
-            :class="dialogType === 'approve' ? 'btn-approve' : 'btn-reject'"
-            :disabled="submitting"
-          >
-            {{ submitting ? '处理中...' : (dialogType === 'approve' ? '确认批准' : '确认驳回') }}
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
+  </MainLayout>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { approvalApi, type Approval } from '../api/approval'
+import MainLayout from '../components/MainLayout.vue'
 
 const approvals = ref<Approval[]>([])
 const loading = ref(true)
@@ -184,11 +187,10 @@ onMounted(() => {
 .approvals-page {
   max-width: 900px;
   margin: 0 auto;
-  padding: 24px;
 }
 
 .page-header {
-  margin-bottom: 32px;
+  margin-bottom: var(--sp-24);
 }
 
 .page-title {
@@ -200,28 +202,29 @@ onMounted(() => {
 
 .loading {
   text-align: center;
-  padding: 48px;
+  padding: var(--sp-48);
   color: var(--color-text-secondary);
 }
 
 .error-message {
-  padding: 16px;
-  background: #fee;
-  color: #c33;
-  border-radius: 8px;
+  padding: var(--sp-16);
+  background: var(--color-error-bg);
+  color: var(--color-error);
+  border-radius: var(--radius-8);
   text-align: center;
+  border-left: 3px solid var(--color-error);
 }
 
 .empty-state {
   text-align: center;
-  padding: 64px 24px;
+  padding: var(--sp-48) var(--sp-24);
   color: var(--color-text-secondary);
 }
 
 .empty-state svg {
   width: 64px;
   height: 64px;
-  margin-bottom: 16px;
+  margin-bottom: var(--sp-16);
   opacity: 0.3;
 }
 
@@ -233,24 +236,24 @@ onMounted(() => {
 .approvals-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--sp-16);
 }
 
 .approval-card {
-  background: var(--color-surface-secondary);
-  border-radius: 12px;
-  padding: 20px;
+  background: var(--color-bg-1);
+  border-radius: var(--radius-12);
+  padding: var(--sp-20);
   border: 1px solid var(--color-border);
 }
 
 .approval-header {
-  margin-bottom: 16px;
+  margin-bottom: var(--sp-16);
 }
 
 .asset-link {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--sp-12);
   text-decoration: none;
   color: var(--color-text-primary);
   transition: opacity 0.2s;
@@ -279,16 +282,16 @@ onMounted(() => {
 .approval-meta {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 20px;
-  padding: 12px;
-  background: var(--color-surface-primary);
-  border-radius: 8px;
+  gap: var(--sp-8);
+  margin-bottom: var(--sp-20);
+  padding: var(--sp-12);
+  background: var(--color-bg-2);
+  border-radius: var(--radius-8);
 }
 
 .meta-item {
   display: flex;
-  gap: 8px;
+  gap: var(--sp-8);
   font-size: 14px;
 }
 
@@ -303,7 +306,7 @@ onMounted(() => {
 
 .approval-actions {
   display: flex;
-  gap: 12px;
+  gap: var(--sp-12);
 }
 
 .approval-actions button {
@@ -311,10 +314,10 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 10px 20px;
+  gap: var(--sp-8);
+  padding: var(--sp-10) var(--sp-20);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-8);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -359,19 +362,20 @@ onMounted(() => {
 }
 
 .modal-content {
-  background: var(--color-surface-primary);
-  border-radius: 16px;
+  background: var(--color-bg-1);
+  border-radius: var(--radius-16);
   width: 90%;
   max-width: 500px;
   max-height: 80vh;
   overflow: auto;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
 }
 
 .modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 24px;
+  padding: var(--sp-20) var(--sp-24);
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -391,13 +395,13 @@ onMounted(() => {
   border: none;
   background: transparent;
   color: var(--color-text-secondary);
-  border-radius: 8px;
+  border-radius: var(--radius-8);
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .btn-close:hover {
-  background: var(--color-surface-secondary);
+  background: var(--color-bg-2);
 }
 
 .btn-close svg {
@@ -406,29 +410,29 @@ onMounted(() => {
 }
 
 .modal-body {
-  padding: 24px;
+  padding: var(--sp-24);
 }
 
 .asset-info {
-  padding: 16px;
-  background: var(--color-surface-secondary);
-  border-radius: 8px;
-  margin-bottom: 20px;
+  padding: var(--sp-16);
+  background: var(--color-bg-2);
+  border-radius: var(--radius-8);
+  margin-bottom: var(--sp-20);
 }
 
 .asset-info p {
-  margin: 8px 0;
+  margin: var(--sp-8) 0;
   font-size: 14px;
   color: var(--color-text-primary);
 }
 
 .form-group {
-  margin-bottom: 16px;
+  margin-bottom: var(--sp-16);
 }
 
 .form-group label {
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: var(--sp-8);
   font-size: 14px;
   font-weight: 500;
   color: var(--color-text-primary);
@@ -436,34 +440,36 @@ onMounted(() => {
 
 .form-group textarea {
   width: 100%;
-  padding: 12px;
+  padding: var(--sp-12);
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: var(--radius-8);
   font-size: 14px;
   font-family: inherit;
-  background: var(--color-surface-primary);
+  background: var(--color-bg-1);
   color: var(--color-text-primary);
   resize: vertical;
   min-height: 100px;
+  outline: none;
+  transition: all 0.2s;
 }
 
 .form-group textarea:focus {
-  outline: none;
   border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(27, 170, 127, 0.1);
 }
 
 .modal-footer {
   display: flex;
-  gap: 12px;
-  padding: 20px 24px;
+  gap: var(--sp-12);
+  padding: var(--sp-20) var(--sp-24);
   border-top: 1px solid var(--color-border);
 }
 
 .modal-footer button {
   flex: 1;
-  padding: 10px 20px;
+  padding: var(--sp-10) var(--sp-20);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-8);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -471,8 +477,9 @@ onMounted(() => {
 }
 
 .btn-secondary {
-  background: var(--color-surface-secondary);
+  background: var(--color-bg-2);
   color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
 }
 
 .btn-secondary:hover {

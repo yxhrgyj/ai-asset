@@ -39,6 +39,13 @@
             </svg>
             撤回审批
           </button>
+          <button v-if="isDraft" @click="archiveAsset" class="btn-danger">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            </svg>
+            归档
+          </button>
         </div>
       </div>
 
@@ -632,6 +639,17 @@ const deleteFile = async (fileId: string) => {
   }
 }
 
+const archiveAsset = async () => {
+  if (!confirm('确认归档此资产？归档后将从列表中隐藏，但可以在归档列表中找回。')) return
+
+  try {
+    await assetApi.archive(route.params.id as string, true)
+    router.push('/assets')
+  } catch (err: any) {
+    alert(err.message || '归档失败')
+  }
+}
+
 const getDownloadUrl = (file: AssetFile) => {
   return assetApi.downloadFile(route.params.id as string, file.id)
 }
@@ -829,7 +847,7 @@ const formatDateTime = (dateStr?: string) => {
   gap: var(--sp-12);
 }
 
-.btn-primary, .btn-secondary {
+.btn-primary, .btn-secondary, .btn-danger {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-8);
@@ -859,7 +877,7 @@ const formatDateTime = (dateStr?: string) => {
   cursor: not-allowed;
 }
 
-.btn-primary svg, .btn-secondary svg {
+.btn-primary svg, .btn-secondary svg, .btn-danger svg {
   width: 16px;
   height: 16px;
 }
@@ -876,6 +894,24 @@ const formatDateTime = (dateStr?: string) => {
 }
 
 .btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-danger {
+  background: transparent;
+  color: #ef4444;
+  border: 1px solid #ef4444;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #ef4444;
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.btn-danger:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }

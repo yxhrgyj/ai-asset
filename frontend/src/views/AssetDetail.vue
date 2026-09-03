@@ -334,7 +334,7 @@ const uploading = ref(false)
 const uploadProgress = ref(0)
 
 const asset = computed(() => detail.value?.asset)
-const currentVersion = computed(() => detail.value?.version)
+const currentVersion = computed(() => detail.value?.currentVersion)
 
 const isDraft = computed(() =>
   currentVersion.value?.status === 'DRAFT'
@@ -530,7 +530,7 @@ const getDownloadUrl = (file: AssetFile) => {
 const downloadSingleFile = async (file: AssetFile) => {
   // 记录下载次数
   try {
-    await assetApi.recordDownload(route.params.id as string, detail.value!.id)
+    await assetApi.recordDownload(route.params.id as string, detail.value!.currentVersion?.id)
     // 更新本地显示的下载次数
     if (asset.value) {
       asset.value.downloadCount = (asset.value.downloadCount || 0) + 1
@@ -554,7 +554,7 @@ const downloadAllFiles = async () => {
 
   // 记录下载次数
   try {
-    await assetApi.recordDownload(route.params.id as string, detail.value.id)
+    await assetApi.recordDownload(route.params.id as string, detail.value.currentVersion?.id)
     // 更新本地显示的下载次数
     if (asset.value) {
       asset.value.downloadCount = (asset.value.downloadCount || 0) + 1
@@ -564,7 +564,7 @@ const downloadAllFiles = async () => {
   }
 
   // 触发 ZIP 打包下载
-  const url = assetApi.downloadAllFiles(route.params.id as string, detail.value.id)
+  const url = assetApi.downloadAllFiles(route.params.id as string, detail.value.currentVersion?.id)
   const link = document.createElement('a')
   link.href = url
   document.body.appendChild(link)

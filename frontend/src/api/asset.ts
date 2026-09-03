@@ -49,7 +49,7 @@ export interface AssetFile {
 
 export interface AssetDetail {
   asset: Asset
-  version?: AssetVersion
+  currentVersion?: AssetVersion
   body?: string
   versions: AssetVersion[]
   files: AssetFile[]

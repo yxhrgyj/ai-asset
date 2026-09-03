@@ -96,8 +96,9 @@ public class ApprovalService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "该审批已处理");
         }
 
-        // 审批人不能是提交人（数据库也会拦，但这里先检查给出更友好的错误）
-        if (approval.getSubmittedBy().equals(current.user().getId())) {
+        // 审批人不能是提交人（ADMIN 除外，ADMIN 可以审批自己提交的内容）
+        if (approval.getSubmittedBy().equals(current.user().getId())
+                && current.user().getRole() != User.Role.ADMIN) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "不能审批自己提交的内容");
         }
 

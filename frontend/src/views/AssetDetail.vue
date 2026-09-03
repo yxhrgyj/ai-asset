@@ -27,13 +27,17 @@
             </svg>
             编辑内容
           </button>
-          <button v-if="isDraft && hasContent" @click="publishDraft" class="btn-primary">
+          <button v-if="isDraft && hasContent" @click="submitForApproval" class="btn-primary">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="16 16 12 12 8 16"/>
-              <line x1="12" y1="12" x2="12" y2="21"/>
-              <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+              <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
             </svg>
-            发布
+            提交审批
+          </button>
+          <button v-if="isPending" @click="withdrawApproval" class="btn-secondary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 12h18M12 5l7 7-7 7"/>
+            </svg>
+            撤回审批
           </button>
         </div>
       </div>
@@ -307,6 +311,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { assetApi, type AssetDetail, type AssetType, type AssetScope, type AssetFile } from '../api/asset'
+import { approvalApi } from '../api/approval'
 import MainLayout from '../components/MainLayout.vue'
 import { marked } from 'marked'
 
@@ -333,6 +338,10 @@ const currentVersion = computed(() => detail.value?.version)
 
 const isDraft = computed(() =>
   currentVersion.value?.status === 'DRAFT'
+)
+
+const isPending = computed(() =>
+  currentVersion.value?.status === 'PENDING'
 )
 
 const hasContent = computed(() =>
@@ -404,6 +413,37 @@ const saveDraft = async () => {
     closeEditor()
   } catch (err: any) {
     editorError.value = err.message || '保存失败'
+  }
+}
+
+const submitForApproval = async () => {
+  if (!confirm('确认提交审批？提交后将无法编辑，直到审批完成。')) return
+  try {
+    await approvalApi.submit(route.params.id as string)
+    await loadAsset()
+    alert('已提交审批，请等待审批人处理')
+  } catch (err: any) {
+    alert(err.message || '提交失败')
+  }
+}
+
+const withdrawApproval = async () => {
+  if (!confirm('确认撤回审批？撤回后版本将回到草稿状态。')) return
+  try {
+    // 需要先获取当前版本的审批记录
+    const approvals = await approvalApi.getVersionApprovals(currentVersion.value!.id)
+    const pendingApproval = approvals.find(a => !a.decidedAt)
+
+    if (!pendingApproval) {
+      alert('未找到待审批记录')
+      return
+    }
+
+    await approvalApi.withdraw(pendingApproval.id)
+    await loadAsset()
+    alert('已撤回审批')
+  } catch (err: any) {
+    alert(err.message || '撤回失败')
   }
 }
 

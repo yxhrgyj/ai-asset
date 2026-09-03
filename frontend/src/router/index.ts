@@ -6,6 +6,7 @@ import Home from '../views/Home.vue'
 import Teams from '../views/Teams.vue'
 import Users from '../views/Users.vue'
 import Assets from '../views/Assets.vue'
+import Approvals from '../views/Approvals.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -46,6 +47,12 @@ const router = createRouter({
       path: '/assets/:id',
       name: 'asset-detail',
       component: () => import('../views/AssetDetail.vue')
+    },
+    {
+      path: '/approvals',
+      name: 'approvals',
+      component: Approvals,
+      meta: { approverOnly: true }
     }
   ]
 })
@@ -64,6 +71,8 @@ router.beforeEach(async (to, from, next) => {
   } else if (auth.user?.mustChangePassword && to.name !== 'change-password') {
     next({ name: 'change-password' })
   } else if (to.meta.adminOnly && auth.user?.role !== 'ADMIN') {
+    next({ name: 'home' })
+  } else if (to.meta.approverOnly && auth.user?.role !== 'APPROVER' && auth.user?.role !== 'ADMIN') {
     next({ name: 'home' })
   } else {
     next()

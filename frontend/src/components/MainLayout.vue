@@ -45,6 +45,13 @@
             <span>团队管理</span>
           </router-link>
 
+          <router-link v-if="auth.user?.role === 'APPROVER' || auth.user?.role === 'ADMIN'" to="/approvals" class="nav-item" active-class="active">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <span>审批管理</span>
+          </router-link>
+
           <router-link v-if="auth.user?.role === 'ADMIN'" to="/users" class="nav-item" active-class="active">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>

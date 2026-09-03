@@ -344,9 +344,11 @@ const isPending = computed(() =>
   currentVersion.value?.status === 'PENDING'
 )
 
-const hasContent = computed(() =>
-  detail.value?.body && detail.value.body.trim().length > 0
-)
+const hasContent = computed(() => {
+  const hasBody = detail.value?.body && detail.value.body.trim().length > 0
+  const hasFiles = detail.value?.files && detail.value.files.length > 0
+  return hasBody || hasFiles
+})
 
 const renderedBody = computed(() => {
   if (!detail.value?.body) return ''

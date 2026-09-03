@@ -175,6 +175,42 @@
         </div>
       </div>
 
+      <!-- 审批流程 -->
+      <div v-if="isPending && approvalHistory.length > 0" class="approval-section">
+        <h2 class="section-title">审批流程</h2>
+        <div class="approval-flow">
+          <div class="flow-item">
+            <div class="flow-status flow-completed">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+            </div>
+            <div class="flow-content">
+              <div class="flow-title">提交审批</div>
+              <div class="flow-meta">
+                <span>{{ approvalHistory[0]?.submittedByName || '未知' }}</span>
+                <span class="flow-time">{{ formatDateTime(approvalHistory[0]?.submittedAt) }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-item">
+            <div class="flow-status flow-pending">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+              </svg>
+            </div>
+            <div class="flow-content">
+              <div class="flow-title">待审批</div>
+              <div class="flow-meta">
+                <span class="flow-waiting">等待审批人处理</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 版本历史 -->
       <div v-if="detail?.versions && detail.versions.length > 0" class="versions-section">
         <h2 class="section-title">版本历史</h2>
@@ -231,6 +267,47 @@
               <button @click="closeEditor" class="btn-secondary">取消</button>
               <button @click="saveDraft" class="btn-primary">保存草稿</button>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 提交审批对话框 -->
+      <div v-if="showApprovalDialog" class="dialog-overlay" @click="cancelSubmitApproval">
+        <div class="dialog" @click.stop>
+          <div class="dialog-header">
+            <h2>提交审批</h2>
+            <button @click="cancelSubmitApproval" class="btn-close">×</button>
+          </div>
+          <div class="dialog-body">
+            <div class="approval-info">
+              <div class="info-row">
+                <span class="info-label">资产名称</span>
+                <span class="info-value">{{ asset?.name }}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">当前版本</span>
+                <span class="info-value">v{{ currentVersion?.versionNo }}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">提交说明</span>
+                <span class="info-hint">提交后将无法编辑，直到审批完成</span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">备注（可选）</label>
+              <textarea
+                v-model="approvalComment"
+                class="form-textarea"
+                placeholder="可添加备注说明..."
+                rows="3"
+              />
+            </div>
+          </div>
+          <div class="dialog-footer">
+            <button @click="cancelSubmitApproval" class="btn-secondary" :disabled="submittingApproval">取消</button>
+            <button @click="confirmSubmitApproval" class="btn-primary" :disabled="submittingApproval">
+              {{ submittingApproval ? '提交中...' : '确认提交' }}
+            </button>
           </div>
         </div>
       </div>
@@ -333,6 +410,8 @@ const uploadError = ref('')
 const uploading = ref(false)
 const uploadProgress = ref(0)
 
+const approvalHistory = ref<any[]>([])
+
 const asset = computed(() => detail.value?.asset)
 const currentVersion = computed(() => detail.value?.currentVersion)
 
@@ -372,10 +451,23 @@ const loadAsset = async () => {
     if (detail.value?.body) {
       editorContent.value = detail.value.body
     }
+    // 加载审批历史
+    if (currentVersion.value?.id) {
+      await loadApprovalHistory()
+    }
   } catch (err: any) {
     console.error('Failed to load asset:', err)
   } finally {
     loading.value = false
+  }
+}
+
+const loadApprovalHistory = async () => {
+  if (!currentVersion.value?.id) return
+  try {
+    approvalHistory.value = await approvalApi.getVersionApprovals(currentVersion.value.id)
+  } catch (err: any) {
+    console.error('Failed to load approval history:', err)
   }
 }
 
@@ -418,19 +510,36 @@ const saveDraft = async () => {
   }
 }
 
+const showApprovalDialog = ref(false)
+const approvalComment = ref('')
+const submittingApproval = ref(false)
+
 const submitForApproval = async () => {
   if (!hasContent.value) {
     alert('请先编辑并保存内容后再提交审批')
     return
   }
-  if (!confirm('确认提交审批？提交后将无法编辑，直到审批完成。')) return
+  showApprovalDialog.value = true
+}
+
+const confirmSubmitApproval = async () => {
+  submittingApproval.value = true
   try {
     await approvalApi.submit(route.params.id as string)
     await loadAsset()
+    showApprovalDialog.value = false
+    approvalComment.value = ''
     alert('已提交审批，请等待审批人处理')
   } catch (err: any) {
     alert(err.message || '提交失败')
+  } finally {
+    submittingApproval.value = false
   }
+}
+
+const cancelSubmitApproval = () => {
+  showApprovalDialog.value = false
+  approvalComment.value = ''
 }
 
 const withdrawApproval = async () => {
@@ -650,6 +759,18 @@ const getStatusClass = (status: string) => {
 const formatDate = (dateStr: string) => {
   const date = new Date(dateStr)
   return date.toLocaleString('zh-CN')
+}
+
+const formatDateTime = (dateStr?: string) => {
+  if (!dateStr) return '-'
+  const date = new Date(dateStr)
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
 }
 </script>
 
@@ -1273,6 +1394,146 @@ const formatDate = (dateStr: string) => {
   margin-top: var(--sp-24);
   padding-top: var(--sp-20);
   border-top: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.approval-info {
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-12);
+  padding: var(--sp-20);
+  margin-bottom: var(--sp-20);
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: var(--sp-12) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.info-row:last-child {
+  border-bottom: none;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.info-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.info-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.info-hint {
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+  font-style: italic;
+}
+
+.form-textarea {
+  width: 100%;
+  padding: var(--sp-12) var(--sp-16);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-text-primary);
+  background: var(--color-bg-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-8);
+  outline: none;
+  resize: vertical;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.form-textarea:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(27, 170, 127, 0.1);
+}
+
+.approval-section {
+  background: var(--color-bg-1);
+  border-radius: var(--radius-12);
+  padding: var(--sp-24);
+  border: 1px solid var(--color-border);
+}
+
+.approval-flow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-24);
+  margin-top: var(--sp-20);
+}
+
+.flow-item {
+  display: flex;
+  gap: var(--sp-16);
+  flex: 1;
+}
+
+.flow-status {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.flow-status svg {
+  width: 24px;
+  height: 24px;
+}
+
+.flow-completed {
+  background: #D1FAE5;
+  color: #059669;
+}
+
+.flow-pending {
+  background: #FEF3C7;
+  color: #D97706;
+}
+
+.flow-content {
+  flex: 1;
+}
+
+.flow-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: var(--sp-4);
+}
+
+.flow-meta {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.flow-time {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+
+.flow-waiting {
+  color: #D97706;
+  font-weight: 500;
+}
+
+.flow-arrow {
+  font-size: 24px;
+  color: var(--color-border);
   flex-shrink: 0;
 }
 

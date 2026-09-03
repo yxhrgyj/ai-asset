@@ -27,7 +27,7 @@
             </svg>
             编辑内容
           </button>
-          <button v-if="isDraft && hasContent" @click="submitForApproval" class="btn-primary">
+          <button v-if="isDraft" @click="submitForApproval" class="btn-primary">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
             </svg>
@@ -417,6 +417,10 @@ const saveDraft = async () => {
 }
 
 const submitForApproval = async () => {
+  if (!hasContent.value) {
+    alert('请先编辑并保存内容后再提交审批')
+    return
+  }
   if (!confirm('确认提交审批？提交后将无法编辑，直到审批完成。')) return
   try {
     await approvalApi.submit(route.params.id as string)

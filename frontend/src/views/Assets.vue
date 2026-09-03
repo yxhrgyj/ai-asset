@@ -291,13 +291,14 @@
             </div>
 
             <div v-if="error" class="error-message">{{ error }}</div>
+            <div v-if="creatingProgress" class="progress-message">{{ creatingProgress }}</div>
 
             <div class="dialog-footer">
-              <button v-if="createStep > 1" type="button" @click="createStep--" class="btn-secondary">上一步</button>
-              <button type="button" @click="closeDialog" class="btn-secondary">取消</button>
-              <button v-if="createStep < 3" type="button" @click="createStep++" class="btn-primary">下一步</button>
+              <button v-if="createStep > 1" type="button" @click="createStep--" class="btn-secondary" :disabled="creating">上一步</button>
+              <button type="button" @click="closeDialog" class="btn-secondary" :disabled="creating">取消</button>
+              <button v-if="createStep < 3" type="button" @click="createStep++" class="btn-primary" :disabled="creating">下一步</button>
               <button v-if="createStep === 3" type="submit" class="btn-primary" :disabled="creating">
-                {{ creating ? '创建中...' : '完成创建' }}
+                {{ creating ? (creatingProgress || '创建中...') : '完成创建' }}
               </button>
             </div>
           </form>
@@ -335,6 +336,7 @@ const total = ref(0)
 const showCreateDialog = ref(false)
 const createStep = ref(1)
 const creating = ref(false)
+const creatingProgress = ref('')
 const formData = ref({
   type: 'RULE' as AssetType,
   name: '',
@@ -437,6 +439,7 @@ const handleCreate = async () => {
 
     // 如果有内容，保存草稿
     if (formData.value.body && formData.value.body.trim()) {
+      creatingProgress.value = '正在保存内容...'
       await assetApi.saveDraft(created.id, {
         body: formData.value.body,
         changelog: formData.value.changelog || undefined
@@ -445,7 +448,9 @@ const handleCreate = async () => {
 
     // 如果有附件，上传附件
     if (createFiles.value.length > 0) {
-      for (const item of createFiles.value) {
+      for (let i = 0; i < createFiles.value.length; i++) {
+        const item = createFiles.value[i]
+        creatingProgress.value = `正在上传附件 ${i + 1}/${createFiles.value.length}...`
         await assetApi.uploadFile(
           created.id,
           item.file,
@@ -459,6 +464,7 @@ const handleCreate = async () => {
     error.value = err.message || '创建失败'
   } finally {
     creating.value = false
+    creatingProgress.value = ''
   }
 }
 
@@ -1048,6 +1054,22 @@ select.form-input:hover {
   font-size: 14px;
   border-left: 3px solid var(--color-error);
   margin-bottom: var(--sp-20);
+}
+
+.progress-message {
+  padding: var(--sp-12) var(--sp-16);
+  background: var(--color-primary-bg);
+  color: var(--color-primary);
+  border-radius: var(--radius-8);
+  font-size: 14px;
+  border-left: 3px solid var(--color-primary);
+  margin-bottom: var(--sp-20);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
 }
 
 .dialog-footer {

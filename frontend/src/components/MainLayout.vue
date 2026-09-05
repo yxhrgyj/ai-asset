@@ -35,6 +35,16 @@
             <span>资产库</span>
           </router-link>
 
+          <router-link to="/projects" class="nav-item" active-class="active">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="7" height="7"/>
+              <rect x="14" y="3" width="7" height="7"/>
+              <rect x="14" y="14" width="7" height="7"/>
+              <rect x="3" y="14" width="7" height="7"/>
+            </svg>
+            <span>项目管理</span>
+          </router-link>
+
           <router-link to="/teams" class="nav-item" active-class="active">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
@@ -43,6 +53,13 @@
               <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
             </svg>
             <span>团队管理</span>
+          </router-link>
+
+          <router-link to="/statistics" class="nav-item" active-class="active">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+            </svg>
+            <span>平台统计</span>
           </router-link>
 
           <router-link v-if="auth.user?.role === 'APPROVER' || auth.user?.role === 'ADMIN'" to="/approvals" class="nav-item" active-class="active">

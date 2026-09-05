@@ -40,13 +40,16 @@ public class AssetController {
                                     @RequestParam(required = false) Asset.Type type,
                                     @RequestParam(required = false) Asset.Scope scope,
                                     @RequestParam(required = false) String tag,
+                                    @RequestParam(required = false, defaultValue = "false") Boolean archived,
                                     @RequestParam(defaultValue = "0") int page,
                                     @RequestParam(defaultValue = "20") int size) {
+
         Page<Asset> found = assets.search(
                 blankToNull(q),
                 type == null ? null : type.name(),
                 scope == null ? null : scope.name(),
                 blankToNull(tag),
+                archived,
                 PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100)));
 
         return Map.of(

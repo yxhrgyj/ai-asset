@@ -13,6 +13,10 @@ public interface ApprovalRepository extends JpaRepository<Approval, UUID> {
     @Query("SELECT a FROM Approval a WHERE a.decidedAt IS NULL ORDER BY a.submittedAt")
     List<Approval> findPending();
 
+    /** 统计待审批数量 */
+    @Query("SELECT COUNT(a) FROM Approval a WHERE a.decidedAt IS NULL")
+    long countPending();
+
     /** 查询某个版本的所有审批记录（包括历史） */
     List<Approval> findByAssetVersionIdOrderBySubmittedAtDesc(UUID assetVersionId);
 

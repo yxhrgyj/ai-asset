@@ -31,6 +31,7 @@ public final class AssetDto {
                               String changelog,
                               String contentHash,
                               Instant publishedAt,
+                              Instant createdAt,
                               Instant updatedAt) {}
 
     public record FileInfo(UUID id,
@@ -57,7 +58,8 @@ public final class AssetDto {
 
     public static VersionInfo of(AssetVersion v) {
         return new VersionInfo(v.getId(), v.getVersionNo(), v.getStatus().name(),
-                v.getChangelog(), v.getContentHash(), v.getPublishedAt(), v.getUpdatedAt());
+                v.getChangelog(), v.getContentHash(), v.getPublishedAt(),
+                v.getCreatedAt(), v.getUpdatedAt());
     }
 
     public static FileInfo of(AssetFile f) {

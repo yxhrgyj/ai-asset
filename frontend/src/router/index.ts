@@ -7,6 +7,8 @@ import Teams from '../views/Teams.vue'
 import Users from '../views/Users.vue'
 import Assets from '../views/Assets.vue'
 import Approvals from '../views/Approvals.vue'
+import Statistics from '../views/Statistics.vue'
+import Projects from '../views/Projects.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -53,11 +55,26 @@ const router = createRouter({
       name: 'approvals',
       component: Approvals,
       meta: { approverOnly: true }
+    },
+    {
+      path: '/statistics',
+      name: 'statistics',
+      component: Statistics
+    },
+    {
+      path: '/projects',
+      name: 'projects',
+      component: Projects
+    },
+    {
+      path: '/projects/:id',
+      name: 'project-detail',
+      component: () => import('../views/ProjectDetail.vue')
     }
   ]
 })
 
-router.beforeEach(async (to, from, next) => {
+router.beforeEach(async (to, _from, next) => {
   const auth = useAuthStore()
 
   if (!auth.user && !to.meta.public) {

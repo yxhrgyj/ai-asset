@@ -2,7 +2,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import AppShell from '../components/AppShell.vue'
-import { renderMarkdown } from '../lib/markdown.js'
+import { MdEditor } from 'md-editor-v3'
+import 'md-editor-v3/lib/style.css'
 import {
   getAsset, createAsset, updateAssetMeta, saveDraft,
   uploadFile, deleteFile, fileUrl,
@@ -36,12 +37,10 @@ const loading = ref(!isNew.value)
 const saving = ref(false)
 const error = ref('')
 const notice = ref('')
-const preview = ref(false)
 const uploading = ref('')
 const fileInput = ref(null)
 const dirInput = ref(null)
 
-const preview_html = computed(() => renderMarkdown(body.value))
 const needsTechStack = computed(() => form.value.scope === 'TECH_STACK')
 const editable = computed(() => isNew.value || versionStatus.value === 'DRAFT')
 
@@ -281,38 +280,29 @@ onMounted(() => { if (!isNew.value) load() })
       <template v-if="!metaOnly">
         <div class="body-head">
           <span class="label">正文（Markdown）</span>
-          <div class="toggle">
-            <button
-              type="button"
-              class="btn"
-              :class="{ on: !preview }"
-              @click="preview = false"
-            >编辑</button>
-            <button
-              type="button"
-              class="btn"
-              :class="{ on: preview }"
-              @click="preview = true"
-            >预览</button>
-          </div>
         </div>
 
         <p v-if="!editable" class="dim small">
           当前版本状态为 {{ versionStatus }}，正文不可编辑。改动元信息仍可保存。
         </p>
 
-        <textarea
-          v-show="!preview"
+        <MdEditor
           v-model="body"
-          class="control editor"
+          language="zh-CN"
           :disabled="!editable"
-          spellcheck="false"
-          placeholder="资产正文。提示词、Skill 说明、规则内容都写在这里。"
-        />
-        <article
-          v-show="preview"
-          class="markdown-body editor-preview"
-          v-html="preview_html"
+          :toolbars="[
+            'bold', 'underline', 'italic', 'strikeThrough',
+            '-',
+            'title', 'sub', 'sup', 'quote', 'unorderedList', 'orderedList',
+            '-',
+            'codeRow', 'code', 'link', 'image', 'table',
+            '-',
+            'revoke', 'next',
+            '=',
+            'pageFullscreen', 'fullscreen', 'preview', 'catalog'
+          ]"
+          :preview="editable"
+          :style="{ height: '500px' }"
         />
 
         <label class="field">
@@ -437,41 +427,12 @@ h3 {
   align-items: center;
   justify-content: space-between;
   margin-top: var(--spacing-xs);
+  margin-bottom: var(--spacing-md);
 }
 
 .label {
   font-size: 0.875rem;
   color: var(--text-dim);
-}
-
-.toggle {
-  display: flex;
-  gap: 0.25rem;
-}
-
-.toggle .on {
-  color: var(--surface-0);
-  background: var(--accent);
-}
-
-.editor {
-  min-height: 24rem;
-  font-family: ui-monospace, Consolas, monospace;
-  font-size: 0.9375rem;
-  line-height: 1.65;
-  resize: vertical;
-}
-
-.editor:disabled {
-  opacity: 0.6;
-}
-
-.editor-preview {
-  min-height: 24rem;
-  padding: var(--spacing-md);
-  background: var(--surface-1);
-  border: 1px solid var(--surface-3);
-  border-radius: 0.5rem;
 }
 
 .files {

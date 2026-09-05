@@ -86,6 +86,9 @@ import { ref, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { teamApi, type Team } from '../api/team'
 import MainLayout from '../components/MainLayout.vue'
+import { useDialog } from '../composables/useDialog'
+
+const { confirm, alert } = useDialog()
 
 const auth = useAuthStore()
 const teams = ref<Team[]>([])
@@ -117,13 +120,17 @@ const editTeam = (team: Team) => {
 }
 
 const deleteTeam = async (team: Team) => {
-  if (!confirm(`确认删除团队"${team.name}"？`)) return
+  const confirmed = await confirm({
+    message: `确认删除团队"${team.name}"？`,
+    type: 'warning'
+  })
+  if (!confirmed) return
 
   try {
     await teamApi.delete(team.id)
     await loadTeams()
   } catch (err: any) {
-    alert(err.message || '删除失败')
+    await alert({ message: err.message || '删除失败', type: 'error' })
   }
 }
 

@@ -43,6 +43,10 @@
             <option value="TECH_STACK">技术栈</option>
             <option value="PROJECT">项目级</option>
           </select>
+          <label class="archived-checkbox">
+            <input type="checkbox" v-model="showArchived" @change="loadAssets" />
+            <span>显示已归档</span>
+          </label>
           <button @click="loadAssets" class="btn-search">搜索</button>
         </div>
       </div>
@@ -329,6 +333,7 @@ const error = ref('')
 const searchQuery = ref('')
 const filterType = ref<AssetType | ''>('')
 const filterScope = ref<AssetScope | ''>('')
+const showArchived = ref(false)
 const currentPage = ref(0)
 const pageSize = ref(20)
 const total = ref(0)
@@ -380,17 +385,22 @@ onMounted(async () => {
 const loadAssets = async () => {
   loading.value = true
   try {
-    const response = await assetApi.list({
+    const params = {
       q: searchQuery.value || undefined,
       type: filterType.value || undefined,
       scope: filterScope.value || undefined,
+      archived: showArchived.value,
       page: currentPage.value,
       size: pageSize.value
-    })
+    }
+    console.log('Loading assets with params:', params)
+    const response = await assetApi.list(params)
+    console.log('Response:', response)
     assets.value = response.items
     total.value = response.total
   } catch (err: any) {
     error.value = err.message || '加载失败'
+    console.error('Load assets error:', err)
   } finally {
     loading.value = false
   }
@@ -675,6 +685,30 @@ const renderMarkdown = (text: string) => {
 .filter-select:focus {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(27, 170, 127, 0.1);
+}
+
+.archived-checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  font-size: 14px;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.archived-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-4);
+  cursor: pointer;
+  transition: all 0.2s;
+  accent-color: var(--color-primary);
+}
+
+.archived-checkbox:hover input[type="checkbox"] {
+  border-color: var(--color-primary);
 }
 
 .btn-search {

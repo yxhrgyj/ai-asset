@@ -245,3 +245,146 @@ td {
 tr:hover {
   background: var(--color-bg-2);
 }
+
+/* 对话框样式 */
+.dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  z-index: 2000;
+  padding: var(--sp-24);
+  padding-top: 5vh;
+  overflow-y: auto;
+}
+
+.dialog {
+  background: var(--color-bg-1);
+  border-radius: var(--radius-16);
+  width: 100%;
+  max-width: 600px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+}
+
+.dialog-large {
+  max-width: 900px;
+}
+
+.dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-20) var(--sp-24);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.dialog-header h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.btn-close {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--color-text-tertiary);
+  font-size: 24px;
+  cursor: pointer;
+  border-radius: var(--radius-8);
+  line-height: 1;
+}
+
+.btn-close:hover {
+  background: var(--color-bg-2);
+  color: var(--color-text-primary);
+}
+
+.dialog-body {
+  padding: var(--sp-24);
+  overflow-y: auto;
+  flex: 1;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-12);
+  padding: var(--sp-20) var(--sp-24);
+  border-top: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.form-group {
+  margin-bottom: var(--sp-20);
+}
+
+.form-group:last-child {
+  margin-bottom: 0;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: var(--sp-8);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.form-control {
+  width: 100%;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--color-text-primary);
+  background: var(--color-bg-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-8);
+  padding: var(--sp-12) var(--sp-16);
+  outline: none;
+  transition: all 0.2s;
+}
+
+.form-control:focus {
+  border-color: var(--color-primary);
+}
+
+.form-control::placeholder {
+  color: var(--color-text-tertiary);
+}
+
+textarea.form-control {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.btn-text {
+  background: transparent;
+  color: var(--color-text-secondary);
+  padding: var(--sp-8) var(--sp-12);
+}
+
+.btn-text:hover {
+  color: var(--color-primary);
+  background: transparent;
+}
+
+.empty-state {
+  text-align: center;
+  padding: var(--sp-48);
+  color: var(--color-text-secondary);
+}

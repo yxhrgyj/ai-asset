@@ -44,7 +44,7 @@
                   {{ getRoleLabel(user.role) }}
                 </span>
               </td>
-              <td>{{ user.teamName || '-' }}</td>
+              <td>{{ getTeamName(user.teamId) }}</td>
               <td>
                 <span class="tag" :class="getStatusClass(user.status)">
                   {{ getStatusLabel(user.status) }}
@@ -157,6 +157,9 @@ import { userApi, type User } from '../api/user'
 import { teamApi, type Team } from '../api/team'
 import MainLayout from '../components/MainLayout.vue'
 import CustomSelect from '../components/CustomSelect.vue'
+import { useDialog } from '../composables/useDialog'
+
+const { alert } = useDialog()
 
 const users = ref<User[]>([])
 const teams = ref<Team[]>([])
@@ -165,18 +168,28 @@ const error = ref('')
 
 const showCreateDialog = ref(false)
 const showEditDialog = ref(false)
-const formData = ref({
+interface UserFormData {
+  id: string
+  username: string
+  password: string
+  displayName: string
+  role: User['role']
+  teamId: string
+  status: User['status']
+}
+
+const formData = ref<UserFormData>({
   id: '',
   username: '',
   password: '',
   displayName: '',
-  role: 'MEMBER',
+  role: 'USER',
   teamId: '',
   status: 'ACTIVE'
 })
 
 const roleOptions = [
-  { label: '普通成员', value: 'MEMBER' },
+  { label: '普通成员', value: 'USER' },
   { label: '作者', value: 'AUTHOR' },
   { label: '审批人', value: 'APPROVER' },
   { label: '管理员', value: 'ADMIN' }
@@ -233,15 +246,15 @@ const resetPassword = async (user: User) => {
   if (!newPassword) return
 
   if (newPassword.length < 8) {
-    alert('密码至少 8 位')
+    await alert({ message: '密码至少 8 位', type: 'warning' })
     return
   }
 
   try {
-    await userApi.resetPassword(user.id)
-    alert('密码已重置，用户下次登录需修改密码')
+    await userApi.resetPassword(user.id, { newPassword })
+    await alert({ message: '密码已重置，用户下次登录需修改密码', type: 'success' })
   } catch (err: any) {
-    alert(err.message || '重置失败')
+    await alert({ message: err.message || '重置失败', type: 'error' })
   }
 }
 
@@ -257,16 +270,18 @@ const handleSubmit = async () => {
     if (showEditDialog.value) {
       await userApi.update(formData.value.id, {
         displayName: formData.value.displayName,
-        role: formData.value.role as any,
+        email: null,
+        role: formData.value.role,
         teamId: formData.value.teamId || null,
-        status: formData.value.status as any
+        status: formData.value.status
       })
     } else {
       await userApi.create({
         username: formData.value.username,
         password: formData.value.password,
         displayName: formData.value.displayName,
-        role: formData.value.role as any,
+        email: null,
+        role: formData.value.role,
         teamId: formData.value.teamId || null
       })
     }
@@ -285,7 +300,7 @@ const closeDialogs = () => {
     username: '',
     password: '',
     displayName: '',
-    role: 'MEMBER',
+    role: 'USER',
     teamId: '',
     status: 'ACTIVE'
   }
@@ -297,7 +312,7 @@ const getRoleLabel = (role: string) => {
     ADMIN: '管理员',
     APPROVER: '审批人',
     AUTHOR: '作者',
-    MEMBER: '成员'
+    USER: '成员'
   }
   return labels[role] || role
 }
@@ -307,7 +322,7 @@ const getRoleClass = (role: string) => {
     ADMIN: 'tag-admin',
     APPROVER: 'tag-approver',
     AUTHOR: 'tag-author',
-    MEMBER: 'tag-member'
+    USER: 'tag-member'
   }
   return classes[role] || ''
 }
@@ -318,6 +333,11 @@ const getStatusLabel = (status: string) => {
 
 const getStatusClass = (status: string) => {
   return status === 'ACTIVE' ? 'tag-success' : 'tag-disabled'
+}
+
+const getTeamName = (teamId: string | null) => {
+  if (!teamId) return '-'
+  return teams.value.find(team => team.id === teamId)?.name || '-'
 }
 
 const formatDate = (dateStr: string) => {

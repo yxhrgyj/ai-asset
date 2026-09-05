@@ -247,28 +247,122 @@
       <div v-if="showEditor" class="dialog-overlay" @click="closeEditor">
         <div class="dialog dialog-large" @click.stop>
           <div class="dialog-header">
-            <h2>编辑内容</h2>
+            <h2>编辑草稿</h2>
             <button @click="closeEditor" class="btn-close">×</button>
           </div>
           <div class="dialog-body">
-            <div class="form-group">
-              <label class="form-label">Markdown 内容</label>
-              <textarea
-                v-model="editorContent"
-                class="editor-textarea"
-                placeholder="使用 Markdown 格式编写内容..."
-                rows="20"
-              />
+            <!-- 标签切换 -->
+            <div class="editor-tabs">
+              <button
+                :class="['tab-btn', { active: editorTab === 'content' }]"
+                @click="editorTab = 'content'"
+              >
+                Markdown 内容
+              </button>
+              <button
+                :class="['tab-btn', { active: editorTab === 'files' }]"
+                @click="editorTab = 'files'"
+              >
+                附件管理 ({{ detail?.files?.length || 0 }})
+              </button>
             </div>
-            <div class="form-group">
-              <label class="form-label">变更说明（可选）</label>
-              <input
-                v-model="editorChangelog"
-                type="text"
-                class="form-input"
-                placeholder="简要说明本次修改的内容"
-              />
+
+            <!-- 内容编辑标签页 -->
+            <div v-if="editorTab === 'content'" class="tab-panel">
+              <div class="form-group">
+                <label class="form-label">Markdown 内容</label>
+                <MdEditor
+                  v-model="editorContent"
+                  language="zh-CN"
+                  :toolbars="[
+                    'bold', 'underline', 'italic', 'strikeThrough',
+                    '-',
+                    'title', 'sub', 'sup', 'quote', 'unorderedList', 'orderedList',
+                    '-',
+                    'codeRow', 'code', 'link', 'image', 'table',
+                    '-',
+                    'revoke', 'next',
+                    '=',
+                    'pageFullscreen', 'fullscreen', 'preview', 'catalog'
+                  ]"
+                  :preview="true"
+                  :style="{ height: '500px' }"
+                />
+              </div>
+              <div class="form-group">
+                <label class="form-label">变更说明（可选）</label>
+                <input
+                  v-model="editorChangelog"
+                  type="text"
+                  class="form-input"
+                  placeholder="简要说明本次修改的内容"
+                />
+              </div>
             </div>
+
+            <!-- 附件管理标签页 -->
+            <div v-if="editorTab === 'files'" class="tab-panel">
+              <div class="editor-files-section">
+                <div class="files-header">
+                  <h3>当前版本附件</h3>
+                  <input
+                    type="file"
+                    ref="editorFileInput"
+                    @change="handleEditorFileSelect"
+                    class="file-input"
+                    multiple
+                    style="display: none"
+                  />
+                  <button @click="editorFileInput?.click()" class="btn-primary btn-sm">
+                    添加附件
+                  </button>
+                </div>
+
+                <!-- 待上传文件列表 -->
+                <div v-if="editorSelectedFiles.length > 0" class="pending-files">
+                  <h4>待上传文件</h4>
+                  <div v-for="(item, index) in editorSelectedFiles" :key="'pending-' + index" class="file-item pending">
+                    <div class="file-info">
+                      <div class="file-name">{{ item.file.name }}</div>
+                      <div class="file-size">{{ formatFileSize(item.file.size) }}</div>
+                    </div>
+                    <div class="file-path">
+                      <input
+                        v-model="item.relativePath"
+                        type="text"
+                        class="form-input form-input-sm"
+                        placeholder="相对路径（可选）"
+                      />
+                    </div>
+                    <button @click="removeEditorSelectedFile(index)" class="btn-icon-sm">×</button>
+                  </div>
+                  <button @click="uploadEditorFiles" class="btn-primary btn-sm" :disabled="editorUploading">
+                    {{ editorUploading ? '上传中...' : '上传' }}
+                  </button>
+                </div>
+
+                <!-- 已有附件列表 -->
+                <div v-if="detail?.files && detail.files.length > 0" class="existing-files">
+                  <h4>已有附件</h4>
+                  <div v-for="file in detail.files" :key="file.id" class="file-item">
+                    <div class="file-info">
+                      <div class="file-name">{{ file.relativePath }}</div>
+                      <div class="file-size">{{ formatFileSize(file.sizeBytes) }}</div>
+                    </div>
+                    <div class="file-actions">
+                      <a :href="assetApi.downloadFile(asset!.id, file.id)" target="_blank" class="btn-icon-sm">
+                        ↓
+                      </a>
+                      <button @click="deleteFile(file.id)" class="btn-icon-sm danger">×</button>
+                    </div>
+                  </div>
+                </div>
+                <div v-else class="empty-state">
+                  <p>暂无附件</p>
+                </div>
+              </div>
+            </div>
+
             <div v-if="editorError" class="error-message">{{ editorError }}</div>
             <div class="dialog-footer">
               <button @click="closeEditor" class="btn-secondary">取消</button>
@@ -398,9 +492,13 @@ import { assetApi, type AssetDetail, type AssetType, type AssetScope, type Asset
 import { approvalApi } from '../api/approval'
 import MainLayout from '../components/MainLayout.vue'
 import { marked } from 'marked'
+import { useDialog } from '../composables/useDialog'
+import { MdEditor } from 'md-editor-v3'
+import 'md-editor-v3/lib/style.css'
 
 const route = useRoute()
 const router = useRouter()
+const { confirm, alert } = useDialog()
 
 const loading = ref(true)
 const detail = ref<AssetDetail | null>(null)
@@ -409,6 +507,10 @@ const showEditor = ref(false)
 const editorContent = ref('')
 const editorChangelog = ref('')
 const editorError = ref('')
+const editorTab = ref<'content' | 'files'>('content')
+const editorSelectedFiles = ref<Array<{ file: File, relativePath: string }>>([])
+const editorFileInput = ref<HTMLInputElement | null>(null)
+const editorUploading = ref(false)
 
 const showUploadDialog = ref(false)
 const selectedFiles = ref<Array<{ file: File, relativePath: string }>>([])
@@ -499,7 +601,7 @@ const createNewDraft = async () => {
     await loadAsset()
     showEditor.value = true
   } catch (err: any) {
-    alert(err.message || '创建草稿失败')
+    await alert({ message: err.message || '创建草稿失败', type: 'error' })
   }
 }
 
@@ -510,8 +612,14 @@ const saveDraft = async () => {
       body: editorContent.value,
       changelog: editorChangelog.value || undefined
     })
-    await loadAsset()
+    // 保存成功后重新加载，如果之前选择了特定版本号，保持在该版本
+    if (selectedVersionNo.value !== null) {
+      await loadVersion()
+    } else {
+      await loadAsset()
+    }
     closeEditor()
+    await alert({ message: '草稿已保存', type: 'success' })
   } catch (err: any) {
     editorError.value = err.message || '保存失败'
   }
@@ -523,7 +631,7 @@ const submittingApproval = ref(false)
 
 const submitForApproval = async () => {
   if (!hasContent.value) {
-    alert('请先编辑并保存内容后再提交审批')
+    await alert({ message: '请先编辑并保存内容后再提交审批', type: 'warning' })
     return
   }
   showApprovalDialog.value = true
@@ -533,12 +641,17 @@ const confirmSubmitApproval = async () => {
   submittingApproval.value = true
   try {
     await approvalApi.submit(route.params.id as string)
-    await loadAsset()
+    // 提交审批后重新加载，保持当前选择的版本
+    if (selectedVersionNo.value !== null) {
+      await loadVersion()
+    } else {
+      await loadAsset()
+    }
     showApprovalDialog.value = false
     approvalComment.value = ''
-    alert('已提交审批，请等待审批人处理')
+    await alert({ message: '已提交审批，请等待审批人处理', type: 'success' })
   } catch (err: any) {
-    alert(err.message || '提交失败')
+    await alert({ message: err.message || '提交失败', type: 'error' })
   } finally {
     submittingApproval.value = false
   }
@@ -550,32 +663,32 @@ const cancelSubmitApproval = () => {
 }
 
 const withdrawApproval = async () => {
-  if (!confirm('确认撤回审批？撤回后版本将回到草稿状态。')) return
+  const confirmed = await confirm({
+    message: '确认撤回审批？撤回后版本将回到草稿状态。',
+    type: 'warning'
+  })
+  if (!confirmed) return
+
   try {
     // 需要先获取当前版本的审批记录
     const approvals = await approvalApi.getVersionApprovals(currentVersion.value!.id)
     const pendingApproval = approvals.find(a => !a.decidedAt)
 
     if (!pendingApproval) {
-      alert('未找到待审批记录')
+      await alert({ message: '未找到待审批记录', type: 'error' })
       return
     }
 
     await approvalApi.withdraw(pendingApproval.id)
-    await loadAsset()
-    alert('已撤回审批')
+    // 撤回后重新加载，保持当前选择的版本
+    if (selectedVersionNo.value !== null) {
+      await loadVersion()
+    } else {
+      await loadAsset()
+    }
+    await alert({ message: '已撤回审批', type: 'success' })
   } catch (err: any) {
-    alert(err.message || '撤回失败')
-  }
-}
-
-const publishDraft = async () => {
-  if (!confirm('确认发布当前版本？发布后内容不可修改。')) return
-  try {
-    await assetApi.publish(route.params.id as string)
-    await loadAsset()
-  } catch (err: any) {
-    alert(err.message || '发布失败')
+    await alert({ message: err.message || '撤回失败', type: 'error' })
   }
 }
 
@@ -583,6 +696,55 @@ const closeEditor = () => {
   showEditor.value = false
   editorChangelog.value = ''
   editorError.value = ''
+  editorTab.value = 'content'
+  editorSelectedFiles.value = []
+}
+
+const handleEditorFileSelect = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  if (!input.files) return
+
+  const files = Array.from(input.files)
+  const newFiles = files.map(file => ({
+    file,
+    relativePath: file.name
+  }))
+  editorSelectedFiles.value = [...editorSelectedFiles.value, ...newFiles]
+}
+
+const removeEditorSelectedFile = (index: number) => {
+  editorSelectedFiles.value.splice(index, 1)
+}
+
+const uploadEditorFiles = async () => {
+  if (editorSelectedFiles.value.length === 0) return
+
+  editorUploading.value = true
+  editorError.value = ''
+
+  try {
+    for (const item of editorSelectedFiles.value) {
+      await assetApi.uploadFile(
+        route.params.id as string,
+        item.file,
+        item.relativePath !== item.file.name ? item.relativePath : undefined
+      )
+    }
+
+    // 上传成功后重新加载资产详情
+    if (selectedVersionNo.value !== null) {
+      await loadVersion()
+    } else {
+      await loadAsset()
+    }
+
+    editorSelectedFiles.value = []
+    await alert({ message: '附件上传成功', type: 'success' })
+  } catch (err: any) {
+    editorError.value = err.message || '上传失败'
+  } finally {
+    editorUploading.value = false
+  }
 }
 
 const handleFileSelect = (event: Event) => {
@@ -629,24 +791,38 @@ const uploadFiles = async () => {
 }
 
 const deleteFile = async (fileId: string) => {
-  if (!confirm('确认删除此附件？')) return
+  const confirmed = await confirm({
+    message: '确认删除此附件？',
+    type: 'warning'
+  })
+  if (!confirmed) return
 
   try {
     await assetApi.deleteFile(route.params.id as string, fileId)
-    await loadAsset()
+    // 删除后重新加载，如果在编辑器中则保持在当前版本
+    if (selectedVersionNo.value !== null) {
+      await loadVersion()
+    } else {
+      await loadAsset()
+    }
+    await alert({ message: '附件已删除', type: 'success' })
   } catch (err: any) {
-    alert(err.message || '删除失败')
+    await alert({ message: err.message || '删除失败', type: 'error' })
   }
 }
 
 const archiveAsset = async () => {
-  if (!confirm('确认归档此资产？归档后将从列表中隐藏，但可以在归档列表中找回。')) return
+  const confirmed = await confirm({
+    message: '确认归档此资产？归档后将从列表中隐藏，但可以在归档列表中找回。',
+    type: 'warning'
+  })
+  if (!confirmed) return
 
   try {
     await assetApi.archive(route.params.id as string, true)
     router.push('/assets')
   } catch (err: any) {
-    alert(err.message || '归档失败')
+    await alert({ message: err.message || '归档失败', type: 'error' })
   }
 }
 
@@ -1393,22 +1569,7 @@ const formatDateTime = (dateStr?: string) => {
   transition: all 0.2s;
 }
 
-.editor-textarea {
-  width: 100%;
-  padding: var(--sp-16);
-  font-size: 14px;
-  line-height: 1.6;
-  color: var(--color-text-primary);
-  background: var(--color-bg-2);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-8);
-  outline: none;
-  resize: vertical;
-  font-family: 'Consolas', 'Monaco', monospace;
-  transition: all 0.2s;
-}
-
-.form-input:focus, .editor-textarea:focus {
+.form-input:focus, .form-textarea:focus {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(27, 170, 127, 0.1);
 }
@@ -1571,6 +1732,171 @@ const formatDateTime = (dateStr?: string) => {
   font-size: 24px;
   color: var(--color-border);
   flex-shrink: 0;
+}
+
+/* 编辑器标签页 */
+.editor-tabs {
+  display: flex;
+  gap: var(--sp-8);
+  margin-bottom: var(--sp-20);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tab-btn {
+  padding: var(--sp-12) var(--sp-20);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tab-btn:hover {
+  color: var(--color-text-primary);
+}
+
+.tab-btn.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+.tab-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-16);
+}
+
+.editor-files-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-16);
+}
+
+.files-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.files-header h3,
+.files-header h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.pending-files,
+.existing-files {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+}
+
+.pending-files h4,
+.existing-files h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--sp-8);
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  padding: var(--sp-12);
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-8);
+}
+
+.file-item.pending {
+  background: rgba(27, 170, 127, 0.05);
+  border-color: var(--color-primary);
+}
+
+.file-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+
+.file-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-size {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+
+.file-path {
+  flex: 1;
+  max-width: 300px;
+}
+
+.form-input-sm {
+  height: 32px;
+  padding: var(--sp-8) var(--sp-12);
+  font-size: 13px;
+}
+
+.file-actions {
+  display: flex;
+  gap: var(--sp-8);
+}
+
+.btn-icon-sm {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-8);
+  font-size: 16px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-icon-sm:hover {
+  background: var(--color-bg-2);
+  color: var(--color-text-primary);
+  border-color: var(--color-primary);
+}
+
+.btn-icon-sm.danger {
+  color: #ef4444;
+  border-color: #ef4444;
+}
+
+.btn-icon-sm.danger:hover {
+  background: #ef4444;
+  color: white;
+}
+
+.empty-state {
+  padding: var(--sp-32);
+  text-align: center;
+  color: var(--color-text-tertiary);
+  font-size: 14px;
+}
+
+.empty-state p {
+  margin: 0;
 }
 
 /* 附件区域 */

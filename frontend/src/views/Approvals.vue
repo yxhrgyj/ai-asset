@@ -106,6 +106,9 @@
 import { ref, onMounted } from 'vue'
 import { approvalApi, type Approval } from '../api/approval'
 import MainLayout from '../components/MainLayout.vue'
+import { useDialog } from '../composables/useDialog'
+
+const { alert } = useDialog()
 
 const approvals = ref<Approval[]>([])
 const loading = ref(true)
@@ -153,7 +156,7 @@ const confirmDecision = async () => {
   if (!currentApproval.value) return
 
   if (dialogType.value === 'reject' && !comment.value.trim()) {
-    alert('请填写驳回理由')
+    await alert({ message: '请填写驳回理由', type: 'warning' })
     return
   }
 
@@ -167,7 +170,7 @@ const confirmDecision = async () => {
     closeDialog()
     await loadApprovals()
   } catch (err: any) {
-    alert(err.message || '操作失败')
+    await alert({ message: err.message || '操作失败', type: 'error' })
   } finally {
     submitting.value = false
   }

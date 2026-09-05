@@ -110,6 +110,7 @@ export const assetApi = {
     type?: AssetType
     scope?: AssetScope
     tag?: string
+    archived?: boolean
     page?: number
     size?: number
   }): Promise<ListResponse> => {
@@ -118,6 +119,7 @@ export const assetApi = {
     if (params?.type) searchParams.append('type', params.type)
     if (params?.scope) searchParams.append('scope', params.scope)
     if (params?.tag) searchParams.append('tag', params.tag)
+    if (params?.archived !== undefined) searchParams.append('archived', params.archived.toString())
     if (params?.page !== undefined) searchParams.append('page', params.page.toString())
     if (params?.size !== undefined) searchParams.append('size', params.size.toString())
 

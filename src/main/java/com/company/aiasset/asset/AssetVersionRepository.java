@@ -13,6 +13,12 @@ public interface AssetVersionRepository extends JpaRepository<AssetVersion, UUID
     List<AssetVersion> findByAssetIdOrderByVersionNoDesc(UUID assetId);
 
     /**
+     * 统计指定状态的版本数量
+     */
+    @Query("SELECT COUNT(v) FROM AssetVersion v WHERE CAST(v.status AS string) = :status")
+    long countByStatus(@Param("status") String status);
+
+    /**
      * 当前开放（可编辑）版本。asset_versions_single_open_uk 保证最多一条，
      * 因此这里可以安全返回 Optional 而不是 List。
      */
@@ -36,4 +42,9 @@ public interface AssetVersionRepository extends JpaRepository<AssetVersion, UUID
 
     @Query("select coalesce(max(v.versionNo), 0) from AssetVersion v where v.assetId = :assetId")
     int maxVersionNo(@Param("assetId") UUID assetId);
+
+    /**
+     * 查找资产的所有版本，按创建时间倒序
+     */
+    List<AssetVersion> findByAssetIdOrderByCreatedAtDesc(UUID assetId);
 }

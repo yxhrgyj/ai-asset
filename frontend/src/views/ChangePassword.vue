@@ -58,10 +58,12 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { safeReturnUrl } from '../lib/portal-navigation'
 
 const router = useRouter()
+const route = useRoute()
 const auth = useAuthStore()
 
 const currentPassword = ref('')
@@ -84,7 +86,7 @@ const handleSubmit = async () => {
 
   try {
     await auth.changePassword(currentPassword.value, newPassword.value)
-    router.push('/')
+    router.push(safeReturnUrl(route.query.returnUrl))
   } catch (err: any) {
     error.value = err.message || '修改失败'
   }

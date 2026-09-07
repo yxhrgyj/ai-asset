@@ -97,6 +97,60 @@ public interface AssetRepository extends JpaRepository<Asset, UUID> {
                        @Param("archived") Boolean archived,
                        Pageable pageable);
 
+    /** 公开门户只查询有已发布版本且未归档的资产，过滤发生在分页之前。 */
+    @Query(value = """
+            SELECT * FROM assets a
+            WHERE a.archived = false
+              AND EXISTS (
+                    SELECT 1 FROM asset_versions v
+                    WHERE v.asset_id = a.id AND v.status = 'PUBLISHED'
+              )
+              AND (:type IS NULL OR a.type = :type)
+              AND (:scope IS NULL OR a.scope = :scope)
+              AND (:tag IS NULL OR :tag = ANY(a.tags))
+              AND (
+                    :q IS NULL
+                 OR a.name %> :q
+                 OR a.summary %> :q
+                 OR a.name ILIKE '%' || :q || '%'
+                 OR a.summary ILIKE '%' || :q || '%'
+              )
+            ORDER BY
+              CASE WHEN :q IS NULL THEN 0
+                   ELSE GREATEST(
+                          similarity(a.name, :q),
+                          similarity(coalesce(a.summary, ''), :q)
+                        )
+              END DESC,
+              a.updated_at DESC
+            """,
+            countQuery = """
+            SELECT count(*) FROM assets a
+            WHERE a.archived = false
+              AND EXISTS (
+                    SELECT 1 FROM asset_versions v
+                    WHERE v.asset_id = a.id AND v.status = 'PUBLISHED'
+              )
+              AND (:type IS NULL OR a.type = :type)
+              AND (:scope IS NULL OR a.scope = :scope)
+              AND (:tag IS NULL OR :tag = ANY(a.tags))
+              AND (
+                    :q IS NULL
+                 OR a.name %> :q
+                 OR a.summary %> :q
+                 OR a.name ILIKE '%' || :q || '%'
+                 OR a.summary ILIKE '%' || :q || '%'
+              )
+            """,
+            nativeQuery = true)
+    Page<Asset> searchPublished(@Param("q") String q,
+                                @Param("type") String type,
+                                @Param("scope") String scope,
+                                @Param("tag") String tag,
+                                Pageable pageable);
+
+    List<Asset> findByArchivedFalse();
+
     /**
      * 查找指定类型和作用域的未归档资产
      */

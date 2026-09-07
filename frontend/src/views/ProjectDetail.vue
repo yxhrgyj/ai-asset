@@ -11,7 +11,7 @@
     <div class="page-header">
       <div>
         <div class="breadcrumb">
-          <router-link to="/projects" class="breadcrumb-link">项目管理</router-link>
+          <router-link to="/admin/projects" class="breadcrumb-link">项目管理</router-link>
           <span class="breadcrumb-separator">/</span>
           <span>{{ project.name }}</span>
         </div>

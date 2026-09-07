@@ -328,7 +328,7 @@ async function handleArchive() {
 }
 
 function viewProject(project: Project) {
-  router.push(`/projects/${project.id}`)
+  router.push(`/admin/projects/${project.id}`)
 }
 
 function getErrorMessage(err: unknown, fallback: string): string {

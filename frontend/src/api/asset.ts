@@ -212,5 +212,10 @@ export const assetApi = {
   downloadAllFiles: (assetId: string, versionId?: string): string => {
     const query = versionId ? `?versionId=${versionId}` : ''
     return `${BASE}/assets/${assetId}/files/download-all${query}`
+  },
+
+  exportAsset: (assetId: string, versionNo?: number): string => {
+    const query = versionNo === undefined ? '' : `?versionNo=${versionNo}`
+    return `${BASE}/assets/${assetId}/export${query}`
   }
 }

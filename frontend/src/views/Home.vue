@@ -59,7 +59,7 @@
       <div class="quick-actions">
         <h2 class="section-title">快速入口</h2>
         <div class="actions-grid">
-          <router-link to="/assets" class="action-card">
+          <router-link to="/admin/assets" class="action-card">
             <div class="action-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
@@ -69,7 +69,7 @@
             <div class="action-desc">浏览和管理 AI 资产</div>
           </router-link>
 
-          <router-link to="/teams" class="action-card">
+          <router-link to="/admin/teams" class="action-card">
             <div class="action-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>

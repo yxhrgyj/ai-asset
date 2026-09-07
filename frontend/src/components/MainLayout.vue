@@ -1,5 +1,6 @@
 <template>
-  <div class="layout">
+  <slot v-if="isEmbedded" />
+  <div v-else class="layout">
     <div class="topbar">
       <div class="topbar-accent"></div>
       <div class="topbar-main">
@@ -89,11 +90,13 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
 const router = useRouter()
+const route = useRoute()
+const isEmbedded = computed(() => route.meta.layout === 'admin')
 
 const userInitial = computed(() => {
   const name = auth.user?.displayName || auth.user?.username || 'U'

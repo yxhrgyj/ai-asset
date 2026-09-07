@@ -47,10 +47,12 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { safeReturnUrl } from '../lib/portal-navigation'
 
 const router = useRouter()
+const route = useRoute()
 const auth = useAuthStore()
 
 const username = ref('')
@@ -64,9 +66,9 @@ const handleLogin = async () => {
     await auth.login(username.value, password.value)
 
     if (auth.user?.mustChangePassword) {
-      router.push('/change-password')
+      router.push({ path: '/change-password', query: { returnUrl: safeReturnUrl(route.query.returnUrl) } })
     } else {
-      router.push('/')
+      router.push(safeReturnUrl(route.query.returnUrl))
     }
   } catch (err: any) {
     error.value = err.message || '登录失败，请检查用户名和密码'

@@ -1,4 +1,46 @@
-# 项目进度：项目管理模块复查与修复
+# 项目进度：公开门户实现与验收
+
+最后更新：2026-09-07（Asia/Shanghai）
+
+## 本轮门户状态
+
+- 实现位于隔离工作区 `E:/Objects/ai-asset-platform-portal`，分支 `codex/portal-website`。
+- 已实现公开首页、资产目录与详情、数据台、关于和帮助页面；管理界面位于 `/admin/*`，旧地址保持兼容。
+- 公开 API 在分页前排除未发布和归档资产；详情只提供已发布版本，编辑入口同时校验作者权限与所有权（或管理员身份）。
+- 登录和修改密码保留经过校验的返回地址；目录筛选支持 URL 状态和浏览器后退；Markdown 继续使用 DOMPurify 清理。
+- 下载复用已有认证导出端点，导出响应成功后记录所选版本下载；失败显示错误且不计数。
+- 后台移动抽屉已实现，首页高亮使用 Vue Router 4 精确激活类；后台快捷入口和项目跳转使用 `/admin/*`。
+
+## 本轮验证证据
+
+- 前端契约与导航测试 17/17 通过；最终导航修复经历失败测试、修复、通过，并用真实浏览器断言只存在一个高亮导航项。
+- 后端 `mvn.cmd test`：23/23 通过，失败、错误、跳过均为 0；MockMvc 使用真实 PostgreSQL。
+- 前端生产构建与后端 `mvn.cmd package -DskipTests` 成功；`npm.cmd audit` 返回 0 vulnerabilities。
+- Playwright + 本机 Chrome 浏览器回归 13/13 通过，覆盖搜索、分页、后退恢复、Markdown 清理、登录返回、下载成功和失败、图表像素、桌面与移动布局、后台兼容路由及重试。
+- 浏览器 API 使用夹具拦截；这些结果不等同于当前 Java 服务的完整在线端到端验收。
+- 截图、脚本与结果：`C:/Users/Administrator/.codex/visualizations/2026/09/05/01a07128-75c2-75b2-bd2b-349583f96ac1/portal-20260906/`。
+- 当前预览：`http://127.0.0.1:5173/`。无夹具的正常浏览需要运行当前版本后端。
+- 源码差异检查通过；全工作树差异仍有历史已跟踪生成文件 `frontend/dist/index.html` 的换行空白提示。`frontend/dist` 和 `frontend/tsconfig.tsbuildinfo` 保留本地且不纳入本轮源码提交。
+- 统计页分块约 452 kB；现有后台 AssetDetail 分块约 906 kB，仍有 Vite 大分块提示。
+
+## Cloudflare 部署评估
+
+- 已按 `deploying-cloudflare-pages-d1` 技能评估，尚未执行云端部署。
+- Vue 前端可部署到 Pages：构建目录 `frontend`，命令 `npm ci && npm run build`，产物目录 `dist`。
+- Spring Boot 与 PostgreSQL 不能原样运行于 Pages Functions 和 D1。保留现有后端时，需要外部 Java 服务及同源 `/api` 代理，并验证会话 Cookie 和文件导出。
+- 全量迁入 Pages + D1 需要另行迁移 Java API、PostgreSQL 查询及模式、认证会话和附件存储，不属于一次静态前端部署。
+
+## 精确续作点
+
+1. 源码完成后保留功能分支，集成前按文件检查主工作区现有未提交改动。
+2. 在能够启动当前 Java 服务的环境完成真实登录、公开查询、下载与管理流程在线验收。当前机器先前启动 Tomcat 因 `Unable to establish loopback connection` / `UnixDomainSockets.connect0: Invalid argument` 失败。
+3. 确定外部 Java 后端托管位置和 `/api` 代理后，再执行 Pages 部署与线上验证；如选择 D1，需要独立迁移计划。
+
+---
+
+以下保留上一轮项目管理修复记录，日期和状态属于历史证据。
+
+# 历史记录：项目管理模块复查与修复
 
 最后更新：2026-09-05（Asia/Shanghai）
 

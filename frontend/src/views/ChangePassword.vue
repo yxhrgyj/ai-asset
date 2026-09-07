@@ -2,7 +2,7 @@
   <div class="change-password-page">
     <div class="change-password-container">
       <div class="header">
-        <div class="logo">🔐</div>
+        <div class="logo"><img src="/brand/logo-mark.png" alt="数科院AI资产管理平台 Logo" width="150" height="90" style="object-fit: contain" /></div>
         <h1 class="title">修改密码</h1>
         <p class="subtitle">首次登录需要修改初始密码</p>
       </div>

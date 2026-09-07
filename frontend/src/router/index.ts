@@ -2,7 +2,6 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import Login from '../views/Login.vue'
 import ChangePassword from '../views/ChangePassword.vue'
-import Home from '../views/Home.vue'
 import Teams from '../views/Teams.vue'
 import Users from '../views/Users.vue'
 import Assets from '../views/Assets.vue'
@@ -45,13 +44,13 @@ const router = createRouter({
       component: AdminLayout,
       meta: { layout: 'admin' },
       children: [
-        { path: '', name: 'admin-home', component: Home },
+        { path: '', name: 'admin-home', component: Statistics },
         { path: 'teams', name: 'admin-teams', component: Teams },
         { path: 'users', name: 'admin-users', component: Users, meta: { adminOnly: true } },
         { path: 'assets', name: 'admin-assets', component: Assets },
         { path: 'assets/:id', name: 'admin-asset-detail', component: () => import('../views/AssetDetail.vue') },
         { path: 'approvals', name: 'admin-approvals', component: Approvals, meta: { approverOnly: true } },
-        { path: 'statistics', name: 'admin-statistics', component: Statistics },
+        { path: 'statistics', name: 'admin-statistics', redirect: to => ({ path: '/admin', query: to.query, hash: to.hash }) },
         { path: 'projects', name: 'admin-projects', component: Projects },
         { path: 'projects/:id', name: 'admin-project-detail', component: () => import('../views/ProjectDetail.vue') }
       ]

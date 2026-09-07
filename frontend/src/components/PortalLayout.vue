@@ -3,7 +3,7 @@
     <header class="portal-header">
       <div class="portal-header-inner">
         <RouterLink to="/" class="portal-brand" aria-label="数科院 AI 资产门户">
-          <span class="portal-brand-mark" aria-hidden="true">AI</span>
+          <img class="system-brand-mark" src="/brand/logo-mark.png" alt="" width="56" height="36" />
           <span>
             <strong>数科院</strong>
             <small>AI 资产门户</small>

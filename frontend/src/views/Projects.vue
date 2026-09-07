@@ -438,8 +438,8 @@ function getErrorMessage(err: unknown, fallback: string): string {
   align-items: center;
   gap: var(--sp-4);
   padding: var(--sp-4) var(--sp-12);
-  background: var(--color-primary-light);
-  color: var(--color-primary);
+  background: #e3f4ee;
+  color: #145c46;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 500;

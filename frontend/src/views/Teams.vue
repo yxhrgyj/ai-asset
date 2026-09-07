@@ -7,10 +7,7 @@
           <p class="page-subtitle">管理组织内的团队和成员</p>
         </div>
         <button v-if="auth.user?.role === 'ADMIN'" @click="showCreateDialog = true" class="btn-primary">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="12" y1="5" x2="12" y2="19"/>
-            <line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
+          <Plus :size="16" aria-hidden="true" />
           创建团队
         </button>
       </div>
@@ -18,7 +15,7 @@
       <div v-if="loading" class="loading">加载中...</div>
 
       <div v-else-if="teams.length === 0" class="empty-state">
-        <div class="empty-icon">📦</div>
+        <div class="empty-icon" aria-hidden="true"><UsersRound :size="40" /></div>
         <p class="empty-text">暂无团队</p>
         <button v-if="auth.user?.role === 'ADMIN'" @click="showCreateDialog = true" class="btn-primary">
           创建第一个团队
@@ -28,24 +25,18 @@
       <div v-else class="teams-grid">
         <div v-for="team in teams" :key="team.id" class="team-card">
           <div class="team-header">
-            <div class="team-icon">👥</div>
+            <div class="team-icon" aria-hidden="true"><UsersRound :size="24" :stroke-width="1.75" /></div>
             <div class="team-info">
               <h3 class="team-name">{{ team.name }}</h3>
               <p class="team-meta">创建于 {{ formatDate(team.createdAt) }}</p>
             </div>
           </div>
           <div v-if="auth.user?.role === 'ADMIN'" class="team-actions">
-            <button @click="editTeam(team)" class="btn-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-              </svg>
+            <button @click="editTeam(team)" class="btn-icon" aria-label="编辑团队" title="编辑团队">
+              <SquarePen :size="16" aria-hidden="true" />
             </button>
-            <button @click="deleteTeam(team)" class="btn-icon btn-danger-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="3 6 5 6 21 6"/>
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-              </svg>
+            <button @click="deleteTeam(team)" class="btn-icon btn-danger-icon" aria-label="删除团队" title="删除团队">
+              <Trash2 :size="16" aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -56,7 +47,7 @@
         <div class="dialog" @click.stop>
           <div class="dialog-header">
             <h2>{{ showEditDialog ? '编辑团队' : '创建团队' }}</h2>
-            <button @click="closeDialogs" class="btn-close">×</button>
+            <button @click="closeDialogs" class="btn-close" aria-label="关闭对话框" title="关闭对话框"><X :size="20" aria-hidden="true" /></button>
           </div>
           <form @submit.prevent="handleSubmit" class="dialog-body">
             <div class="form-group">
@@ -83,6 +74,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { UsersRound, Plus, SquarePen, Trash2, X } from '@lucide/vue'
 import { useAuthStore } from '../stores/auth'
 import { teamApi, type Team } from '../api/team'
 import MainLayout from '../components/MainLayout.vue'
@@ -168,6 +160,8 @@ const formatDate = (dateStr: string) => {
 
 .page-header {
   display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
   align-items: flex-start;
   justify-content: space-between;
   margin-bottom: var(--sp-24);
@@ -224,7 +218,9 @@ const formatDate = (dateStr: string) => {
 }
 
 .empty-icon {
-  font-size: 64px;
+  display: flex;
+  justify-content: center;
+  color: #0a754a;
   margin-bottom: var(--sp-16);
 }
 
@@ -236,7 +232,7 @@ const formatDate = (dateStr: string) => {
 
 .teams-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
   gap: var(--sp-20);
 }
 
@@ -263,12 +259,13 @@ const formatDate = (dateStr: string) => {
 .team-icon {
   width: 48px;
   height: 48px;
-  background: var(--color-primary);
-  border-radius: var(--radius-12);
+  background: #e7f5ef;
+  color: #0a754a;
+  border: 1px solid #c7e7dc;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 24px;
   flex-shrink: 0;
 }
 

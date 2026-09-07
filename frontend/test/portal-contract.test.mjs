@@ -43,8 +43,11 @@ test('admin navigation uses canonical routes and highlights only the exact item'
   const projectDetail = await source('views/ProjectDetail.vue')
   const projects = await source('views/Projects.vue')
 
-  assert.match(layout, /:active-class="item\.to === '\/admin' \? '' : 'is-active'"/)
-  assert.match(layout, /exact-active-class="is-active"/)
+  assert.match(layout, /:class="\{ 'is-active': isActive\(item.to\) \}"/)
+  assert.match(layout, /target !== '\/admin'/)
+  assert.match(layout, /route\.matched\[route\.matched\.length - 1\]/)
+  assert.match(layout, /currentPath\.startsWith/)
+  assert.match(layout, /:aria-current="isActive\(item.to\)/)
   assert.doesNotMatch(home, /to="\/(?:assets|teams)"/)
   assert.doesNotMatch(projectDetail, /to="\/projects"/)
   assert.doesNotMatch(projects, /router\.push\(`\/projects\//)

@@ -10,6 +10,7 @@
     "test:contract": "node --experimental-strip-types --test test/*.test.mjs"
   },
   "dependencies": {
+    "@lucide/vue": "^1.42.0",
     "dompurify": "^3.4.15",
     "echarts": "^6.1.0",
     "marked": "^18.0.11",

@@ -5,7 +5,7 @@
       <div class="topbar-accent"></div>
       <div class="topbar-main">
         <div class="topbar-logo">
-          <div class="logo-icon">🤖</div>
+          <img class="system-brand-mark" src="/brand/logo-mark.png" alt="" width="56" height="36" />
           <span class="logo-text">数科院AI资产管理平台</span>
         </div>
         <div class="topbar-right">

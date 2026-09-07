@@ -2,7 +2,7 @@
   <div class="login-page">
     <div class="login-container">
       <div class="login-header">
-        <div class="logo">🤖</div>
+        <div class="logo"><img src="/brand/logo-mark.png" alt="数科院AI资产管理平台 Logo" width="150" height="90" style="object-fit: contain" /></div>
         <h1 class="title">数科院AI资产管理平台</h1>
         <p class="subtitle">AI 资产管理系统</p>
       </div>

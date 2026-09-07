@@ -20,6 +20,16 @@ public interface AssetRepository extends JpaRepository<Asset, UUID> {
 
     long countByArchivedFalse();
 
+    @Query(value = """
+            SELECT count(*) FROM assets a
+            WHERE a.archived = false
+              AND EXISTS (
+                    SELECT 1 FROM asset_versions v
+                    WHERE v.asset_id = a.id AND v.status = 'PUBLISHED'
+              )
+            """, nativeQuery = true)
+    long countPublished();
+
     /**
      * 查询活跃用户（按创建的资产数量和下载数排序）
      */

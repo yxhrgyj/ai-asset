@@ -33,7 +33,7 @@ public class StatisticsService {
 
     public StatisticsController.OverviewStats getOverview() {
         long totalAssets = assets.count();
-        long publishedAssets = assets.countByArchivedFalse();
+        long publishedAssets = assets.countPublished();
         long draftAssets = versions.countByStatus("DRAFT");
         long totalDownloads = downloads.count();
         long totalUsers = users.count();

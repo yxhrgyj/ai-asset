@@ -50,7 +50,7 @@
 
 ## 精确续作点
 
-1. 2026-09-07 用户已明确要求推送远端。本次将源码、Logo、启动脚本、测试及进度记录提交到 `codex/portal-website` 并推送同名远端分支；不合并或覆盖 `main`，保留工作区和本地生成产物。
+1. 2026-09-07 已按用户要求将源码、Logo、启动脚本及测试提交并推送到 `origin/codex/portal-website`；功能提交 `0be3c337459c05d858a6ae458a56881958d41ae5` 已完成本地与远端哈希核验。本进度记录通过后续文档提交同步，不合并或覆盖 `main`。
 2. 用户可使用现有账号在本地验收工作台和团队图标。后续管理写流程验收应使用明确授权的测试数据，不重置 admin 密码、不清理业务数据。
 3. 云端部署按用户要求暂缓。未来保留 Java 后端需先确定托管位置和 `/api` 代理；D1 方案需要独立迁移计划。
 
@@ -59,6 +59,7 @@
 - 重新执行前端契约测试 23/23、后端测试 25/25，均通过；前端生产构建成功，已有 AssetDetail 大分块提示保留。
 - 两个 Node 启动脚本语法检查和源码差异空白检查通过。
 - 发布范围不包含 `frontend/dist`、`frontend/tsconfig.tsbuildinfo`、日志、数据库和本地附件；这些文件不删除、不回退。
+- `git push -u origin codex/portal-website` 成功，分支已建立上游；`git ls-remote --heads origin codex/portal-website main` 确认功能提交一致，远端 `main` 保持 `51796d3d7c05507dd3b9dc7ea292bee65223eb17`。未创建 PR、未部署云端。
 
 ---
 

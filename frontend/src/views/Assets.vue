@@ -259,13 +259,15 @@
                 <label class="form-label">选择文件</label>
                 <input
                   type="file"
+                  :accept="UPLOAD_ACCEPT"
+                  :disabled="creating"
                   ref="createFileInput"
                   @change="handleCreateFileSelect"
                   class="file-input"
                   multiple
                 />
                 <div class="file-input-hint">
-                  支持的文件类型：.md, .py, .js, .sh, .json, .yaml, .txt 等文本文件及脚本
+                  {{ UPLOAD_HINT }}
                 </div>
               </div>
 
@@ -279,12 +281,13 @@
                     <label class="form-label-sm">相对路径（可选）</label>
                     <input
                       v-model="item.relativePath"
+                      :disabled="creating"
                       type="text"
                       class="form-input form-input-sm"
                       placeholder="例如: scripts/check.py"
                     />
                   </div>
-                  <button type="button" @click="removeCreateFile(index)" class="btn-icon-sm">
+                  <button type="button" @click="removeCreateFile(index)" class="btn-icon-sm" :disabled="creating" aria-label="移除文件" title="移除文件">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <line x1="18" y1="6" x2="6" y2="18"/>
                       <line x1="6" y1="6" x2="18" y2="18"/>
@@ -298,11 +301,11 @@
             <div v-if="creatingProgress" class="progress-message">{{ creatingProgress }}</div>
 
             <div class="dialog-footer">
-              <button v-if="createStep > 1" type="button" @click="createStep--" class="btn-secondary" :disabled="creating">上一步</button>
+              <button v-if="createStep > 1 && !createdAssetId" type="button" @click="createStep--" class="btn-secondary" :disabled="creating">上一步</button>
               <button type="button" @click="closeDialog" class="btn-secondary" :disabled="creating">取消</button>
               <button v-if="createStep < 3" type="button" @click="createStep++" class="btn-primary" :disabled="creating">下一步</button>
               <button v-if="createStep === 3" type="submit" class="btn-primary" :disabled="creating">
-                {{ creating ? (creatingProgress || '创建中...') : '完成创建' }}
+                {{ creating ? (creatingProgress || '创建中...') : createdAssetId ? '重试保存' : '完成创建' }}
               </button>
             </div>
           </form>
@@ -320,7 +323,8 @@ import { assetApi, type Asset, type AssetType, type AssetScope } from '../api/as
 import { teamApi, type Team } from '../api/team'
 import MainLayout from '../components/MainLayout.vue'
 import CustomSelect from '../components/CustomSelect.vue'
-import { marked } from 'marked'
+import { renderMarkdown } from '../lib/markdown'
+import { UPLOAD_ACCEPT, UPLOAD_HINT, validateUploads } from '../lib/asset-upload'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -342,6 +346,7 @@ const showCreateDialog = ref(false)
 const createStep = ref(1)
 const creating = ref(false)
 const creatingProgress = ref('')
+const createdAssetId = ref<string | null>(null)
 const formData = ref({
   type: 'RULE' as AssetType,
   name: '',
@@ -424,7 +429,9 @@ const goToDetail = (id: string) => {
 }
 
 const handleCreate = async () => {
-  error.value = ''
+  if (creating.value) return
+  error.value = validateUploads(createFiles.value)
+  if (error.value) return
   creating.value = true
 
   try {
@@ -445,12 +452,16 @@ const handleCreate = async () => {
       teamId: formData.value.teamId || undefined
     }
 
-    const created = await assetApi.create(data)
+    if (!createdAssetId.value) {
+      const created = await assetApi.create(data)
+      createdAssetId.value = created.id
+    }
+    const assetId = createdAssetId.value
 
     // 如果有内容，保存草稿
     if (formData.value.body && formData.value.body.trim()) {
       creatingProgress.value = '正在保存内容...'
-      await assetApi.saveDraft(created.id, {
+      await assetApi.saveDraft(assetId, {
         body: formData.value.body,
         changelog: formData.value.changelog || undefined
       })
@@ -458,20 +469,22 @@ const handleCreate = async () => {
 
     // 如果有附件，上传附件
     if (createFiles.value.length > 0) {
-      for (let i = 0; i < createFiles.value.length; i++) {
-        const item = createFiles.value[i]
-        creatingProgress.value = `正在上传附件 ${i + 1}/${createFiles.value.length}...`
+      const total = createFiles.value.length
+      while (createFiles.value.length) {
+        const item = createFiles.value[0]
+        creatingProgress.value = `正在上传附件 ${total - createFiles.value.length + 1}/${total}...`
         await assetApi.uploadFile(
-          created.id,
+          assetId,
           item.file,
           item.relativePath !== item.file.name ? item.relativePath : undefined
         )
+        createFiles.value.shift()
       }
     }
 
-    router.push(`/assets/${created.id}`)
+    router.push(`/admin/assets/${assetId}`)
   } catch (err: any) {
-    error.value = err.message || '创建失败'
+    error.value = (createdAssetId.value ? '草稿已保留，未完成的内容可重试保存。' : '') + (err.message || '创建失败')
   } finally {
     creating.value = false
     creatingProgress.value = ''
@@ -483,10 +496,13 @@ const handleCreateFileSelect = (event: Event) => {
   if (!input.files) return
 
   const files = Array.from(input.files)
-  createFiles.value = files.map(file => ({
+  const selected = files.map(file => ({
     file,
     relativePath: file.name
   }))
+  input.value = ''
+  error.value = validateUploads(selected)
+  if (!error.value) createFiles.value = selected
 }
 
 const removeCreateFile = (index: number) => {
@@ -500,6 +516,11 @@ const formatFileSize = (bytes: number) => {
 }
 
 const closeDialog = () => {
+  if (creating.value) return
+  if (createdAssetId.value) {
+    router.push(`/admin/assets/${createdAssetId.value}`)
+  }
+  createdAssetId.value = null
   showCreateDialog.value = false
   createStep.value = 1
   formData.value = {
@@ -553,10 +574,6 @@ const getScopeLabel = (scope: AssetScope) => {
   return labels[scope]
 }
 
-const renderMarkdown = (text: string) => {
-  if (!text) return '<p class="empty-preview">暂无内容</p>'
-  return marked(text)
-}
 </script>
 
 <style scoped>
@@ -655,6 +672,7 @@ const renderMarkdown = (text: string) => {
 
 .filters {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--sp-12);
   align-items: center;
 }
@@ -754,7 +772,7 @@ const renderMarkdown = (text: string) => {
 /* 资产列表 */
 .assets-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(380px, 100%), 1fr));
   gap: var(--sp-16);
 }
 
@@ -1375,5 +1393,21 @@ select.form-input:hover {
 .markdown-preview .empty-preview {
   color: var(--color-text-tertiary);
   font-style: italic;
+}
+@media (max-width: 680px) {
+  .page-header { flex-wrap: wrap; gap: 12px; }
+  .page-title { font-size: 24px; }
+  .dialog-overlay { padding: 12px; }
+  .dialog { border-radius: 8px; }
+  .dialog-header, .dialog-body { padding: 16px; }
+  .dialog-footer { flex-wrap: wrap; gap: 8px; }
+  .dialog-footer button { padding: 0 12px; flex: 0 0 auto; white-space: nowrap; }
+  .selected-file-item { display: grid; grid-template-columns: minmax(0, 1fr) 24px; gap: 10px; }
+  .selected-file-info { min-width: 0; }
+  .selected-file-path { grid-column: 1 / -1; grid-row: 2; }
+  .selected-file-item .btn-icon-sm { grid-column: 2; grid-row: 1; margin-top: 0; }
+  .editor-layout { grid-template-columns: minmax(0, 1fr); }
+  .editor-textarea { min-height: 240px; }
+  .search-bar, .asset-card { padding: 16px; }
 }
 </style>

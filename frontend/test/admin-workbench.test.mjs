@@ -11,7 +11,7 @@ test('workbench merges real statistics, team count and role-aware shortcuts', as
     assert.match(view, new RegExp(`statisticsApi\\.${api}\\(`))
   }
   assert.match(view, /teamApi\.list\(/)
-  assert.match(view, /auth\.canApprove\(/)
+  assert.doesNotMatch(view, /canApprove|pendingApprovals|审批管理|待审批/)
   assert.match(view, /auth\.isAdmin\(/)
   assert.match(view, /loadData/)
   assert.match(view, /重试/)

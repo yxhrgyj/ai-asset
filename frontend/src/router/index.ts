@@ -5,7 +5,6 @@ import ChangePassword from '../views/ChangePassword.vue'
 import Teams from '../views/Teams.vue'
 import Users from '../views/Users.vue'
 import Assets from '../views/Assets.vue'
-import Approvals from '../views/Approvals.vue'
 import Statistics from '../views/Statistics.vue'
 import Projects from '../views/Projects.vue'
 import PortalLayout from '../components/PortalLayout.vue'
@@ -49,7 +48,7 @@ const router = createRouter({
         { path: 'users', name: 'admin-users', component: Users, meta: { adminOnly: true } },
         { path: 'assets', name: 'admin-assets', component: Assets },
         { path: 'assets/:id', name: 'admin-asset-detail', component: () => import('../views/AssetDetail.vue') },
-        { path: 'approvals', name: 'admin-approvals', component: Approvals, meta: { approverOnly: true } },
+        { path: 'approvals', redirect: '/admin/assets' },
         { path: 'statistics', name: 'admin-statistics', redirect: to => ({ path: '/admin', query: to.query, hash: to.hash }) },
         { path: 'projects', name: 'admin-projects', component: Projects },
         { path: 'projects/:id', name: 'admin-project-detail', component: () => import('../views/ProjectDetail.vue') }
@@ -59,7 +58,7 @@ const router = createRouter({
     { path: '/users', redirect: '/admin/users' },
     { path: '/assets', redirect: '/admin/assets' },
     { path: '/assets/:id', redirect: to => ({ path: `/admin/assets/${to.params.id}`, query: to.query, hash: to.hash }) },
-    { path: '/approvals', redirect: '/admin/approvals' },
+    { path: '/approvals', redirect: '/admin/assets' },
     { path: '/statistics', redirect: '/admin/statistics' },
     { path: '/projects', redirect: '/admin/projects' },
     { path: '/projects/:id', redirect: to => ({ path: `/admin/projects/${to.params.id}`, query: to.query, hash: to.hash }) }
@@ -80,8 +79,6 @@ router.beforeEach(async (to, _from, next) => {
   } else if (to.name === 'login' && auth.user) {
     next(safeReturnUrl(to.query.returnUrl))
   } else if (to.meta.adminOnly && auth.user?.role !== 'ADMIN') {
-    next({ name: 'admin-home' })
-  } else if (to.meta.approverOnly && auth.user?.role !== 'APPROVER' && auth.user?.role !== 'ADMIN') {
     next({ name: 'admin-home' })
   } else {
     next()

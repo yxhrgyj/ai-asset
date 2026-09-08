@@ -4,7 +4,6 @@ export interface OverviewStats {
   draftAssets: number
   totalDownloads: number
   totalUsers: number
-  pendingApprovals: number
 }
 
 export interface PopularAsset {

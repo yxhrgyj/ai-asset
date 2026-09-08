@@ -2,6 +2,8 @@ package com.company.aiasset.asset;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Lock;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
@@ -20,13 +22,13 @@ public interface AssetVersionRepository extends JpaRepository<AssetVersion, UUID
 
     /**
      * 当前开放（可编辑）版本。asset_versions_single_open_uk 保证最多一条，
-     * 因此这里可以安全返回 Optional 而不是 List。
+     * 因此这里可以安全返回 Optional 而不是 List。行锁串行化发布、正文和附件修改。
      */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
            select v from AssetVersion v
            where v.assetId = :assetId
-             and v.status in (com.company.aiasset.asset.AssetVersion$Status.DRAFT,
-                              com.company.aiasset.asset.AssetVersion$Status.PENDING)
+             and v.status = com.company.aiasset.asset.AssetVersion$Status.DRAFT
            """)
     Optional<AssetVersion> findOpenVersion(@Param("assetId") UUID assetId);
 

@@ -12,10 +12,6 @@ public record CurrentUser(User user) {
         return user.getRole() == role;
     }
 
-    public boolean canApprove() {
-        return user.getRole() == User.Role.APPROVER || user.getRole() == User.Role.ADMIN;
-    }
-
     public boolean canAuthor() {
         return user.getRole() != User.Role.USER;
     }

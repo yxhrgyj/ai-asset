@@ -5,181 +5,162 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import javax.imageio.ImageIO;
+import javax.imageio.ImageReadParam;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.MemoryCacheImageInputStream;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.CodingErrorAction;
+import java.nio.charset.StandardCharsets;
+import java.util.Iterator;
 import java.util.Locale;
 import java.util.Set;
 
-/**
- * 上传白名单、路径校验与大小上限。
- *
- * 为什么允许脚本：Skill 在实际用法里是一个目录——SKILL.md 加上脚本、模板、
- * 参考文件。只放 md 和图片等于把 Skill 砍掉一半，取用方拿到的东西跑不起来。
- *
- * 允许脚本不等于放开任意文件。这里的判断依据是：附件永远以
- * Content-Disposition: attachment + X-Content-Type-Options: nosniff +
- * application/octet-stream 下发（见 AssetFileController.download），
- * 浏览器不会在本站源下渲染或执行它，所以「上传即存储型 XSS」的风险已经
- * 在下载环节堵住了，白名单不必再承担这一层。
- *
- * 仍然拒绝两类：
- * 1) 编译产物与安装包（exe/dll/msi/…）——资产库存的是可读的源文本，
- *    二进制既没法审阅也没法 diff，进来了只会变成没人敢删的黑盒。
- * 2) html/htm/svg/xhtml——万一将来有人给附件加了内联预览，这三类会立刻
- *    变成 XSS。留着它们的收益远小于这个隐患。
- */
+/** Validate actual content before storage. Attachments are always downloaded, never rendered inline. */
 @Component
 public class UploadPolicy {
-
-    /** 单文件 10MB。整体请求大小另由 spring.servlet.multipart 限制。 */
     public static final long MAX_BYTES = 10L * 1024 * 1024;
-
-    /** 目录层级上限。Skill 目录不该深过这个数，深了通常是误传了整个仓库。 */
-    private static final int MAX_DEPTH = 4;
-
-    /**
-     * 文本与源码类。这类文件的 Content-Type 各浏览器给得五花八门
-     * （.py 可能是 text/x-python、application/octet-stream 或空），
-     * 拿 MIME 严格配对只会误伤正常上传，所以只认扩展名。
-     */
+    private static final long MAX_IMAGE_PIXELS = 20_000_000;
     private static final Set<String> TEXTUAL = Set.of(
-            // 文档与配置
             "md", "txt", "csv", "json", "yaml", "yml", "toml", "ini", "conf", "env.example",
-            "xml", "properties", "editorconfig",
-            // 脚本
-            "sh", "bash", "zsh", "ps1", "bat", "cmd", "py", "rb", "pl", "lua",
-            // 源码
-            "js", "mjs", "cjs", "ts", "tsx", "jsx", "vue", "java", "kt", "go", "rs",
-            "c", "h", "cpp", "hpp", "cs", "php", "scala", "swift", "sql", "r",
-            // 模板
-            "tpl", "tmpl", "j2", "mustache", "hbs", "patch", "diff"
-    );
+            "xml", "properties", "editorconfig", "sh", "bash", "zsh", "ps1", "bat", "cmd", "py", "rb", "pl", "lua",
+            "js", "mjs", "cjs", "ts", "tsx", "jsx", "vue", "java", "kt", "go", "rs", "c", "h", "cpp", "hpp",
+            "cs", "php", "scala", "swift", "sql", "r", "tpl", "tmpl", "j2", "mustache", "hbs", "patch", "diff");
+    private static final Set<String> IMAGES = Set.of("png", "jpg", "jpeg", "gif", "webp");
+    private static final Set<String> BROWSER_MIME_ALIASES = Set.of("", "application/octet-stream", "application/x-zip-compressed");
 
-    /** 二进制但可信的展示类。这几类要严格配对，因为浏览器对它们有嗅探行为。 */
-    private static final Set<String> IMAGE_PDF = Set.of("png", "jpg", "jpeg", "gif", "webp", "pdf");
-
-    private static final Set<String> DENIED = Set.of(
-            "exe", "dll", "so", "dylib", "msi", "app", "deb", "rpm", "dmg", "pkg",
-            "bin", "o", "obj", "class", "jar", "war", "pyc", "scr", "com", "cpl",
-            "html", "htm", "xhtml", "svg", "swf"
-    );
-
-    /**
-     * 校验并返回规范化后的相对路径，可直接作为 relative_path 入库。
-     *
-     * @param declaredPath 前端传来的相对路径（如 scripts/check.py），为空则退回用文件名
-     */
     public String validate(MultipartFile file, String declaredPath) {
-        if (file.isEmpty()) {
-            throw bad("文件为空");
+        if (file.isEmpty()) throw bad("文件为空");
+        if (file.getSize() > MAX_BYTES) throw tooLarge("单个文件不能超过 10 MB");
+        String path = safePath(declaredPath == null || declaredPath.isBlank() ? file.getOriginalFilename() : declaredPath, 4);
+        String extension = extensionOf(path);
+        String declared = file.getContentType() == null ? "" : file.getContentType().split(";", 2)[0].trim().toLowerCase(Locale.ROOT);
+        if (!TEXTUAL.contains(extension) && !BROWSER_MIME_ALIASES.contains(declared) && !declared.equals(mediaType(path))) {
+            throw bad("文件类型声明与扩展名不一致：" + path);
         }
-        if (file.getSize() > MAX_BYTES) {
-            throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE,
-                    "单个文件不能超过 " + (MAX_BYTES / 1024 / 1024) + "MB");
+        try (InputStream input = file.getInputStream()) {
+            byte[] bytes = input.readNBytes((int) MAX_BYTES + 1);
+            if (bytes.length > MAX_BYTES) throw tooLarge("单个文件不能超过 10 MB");
+            if (bytes.length == 0) throw bad("文件为空");
+            validateContent(path, bytes, false);
+        } catch (IOException e) {
+            throw bad("无法读取上传文件，请重新选择文件");
         }
-
-        String raw = (declaredPath == null || declaredPath.isBlank())
-                ? file.getOriginalFilename()
-                : declaredPath;
-        String path = safePath(raw);
-        String ext = extensionOf(path);
-
-        if (DENIED.contains(ext)) {
-            throw bad("不允许上传 ." + ext + " 文件：资产库只收可读的源文本，"
-                    + "编译产物与可被浏览器渲染的 html/svg 除外");
-        }
-
-        if (IMAGE_PDF.contains(ext)) {
-            requireMimeMatch(file, ext);
-            return path;
-        }
-        if (TEXTUAL.contains(ext)) {
-            return path;
-        }
-        throw bad("不支持的文件类型：." + ext
-                + "。支持 Markdown、脚本（py/sh/ps1/js/…）、源码、配置与图片/PDF");
+        return path;
     }
 
-    /** 只有图片和 PDF 需要扩展名与声明的 MIME 对得上。 */
-    private void requireMimeMatch(MultipartFile file, String ext) {
-        String declared = file.getContentType() == null
-                ? "" : file.getContentType().toLowerCase(Locale.ROOT).split(";")[0].trim();
-        String expected = switch (ext) {
+    /** Use a server-selected MIME in metadata, even when the browser sends a generic type. */
+    public String mediaType(String path) {
+        return switch (extensionOf(path)) {
             case "png" -> "image/png";
             case "jpg", "jpeg" -> "image/jpeg";
             case "gif" -> "image/gif";
             case "webp" -> "image/webp";
-            default -> "application/pdf";
+            case "pdf" -> "application/pdf";
+            case "zip" -> "application/zip";
+            default -> "text/plain";
         };
-        if (!declared.equals(expected)) {
-            throw bad("文件类型与内容声明不一致：." + ext + " 对应 " + declared);
+    }
+
+    static void validateContent(String path, byte[] bytes, boolean insideZip) {
+        String extension = extensionOf(path);
+        if (extension.equals("zip")) {
+            if (insideZip) throw bad("ZIP 内不支持嵌套压缩包：" + path);
+            ZipUploadValidator.validate(bytes);
+        } else if (IMAGES.contains(extension)) {
+            validateImage(bytes, extension, path);
+        } else if (extension.equals("pdf")) {
+            String end = new String(bytes, Math.max(0, bytes.length - 1024), Math.min(bytes.length, 1024), StandardCharsets.ISO_8859_1);
+            if (!starts(bytes, 0x25, 0x50, 0x44, 0x46, 0x2d) || !end.contains("%%EOF")) throw bad("PDF 内容无效或与扩展名不符：" + path);
+        } else if (TEXTUAL.contains(extension)) {
+            validateText(bytes, path);
+        } else {
+            throw bad("不支持的文件类型：" + path + "。支持文本、源码、配置、PNG/JPG/GIF/WebP、PDF 和 ZIP；不接受安装包、编译产物、HTML 或 SVG");
         }
     }
 
-    /**
-     * 规范化相对路径，保留目录结构。
-     *
-     * 与 asset_files_path_safe 的约束方向一致，但在这里挡掉能给出更友好的报错。
-     * 保留目录是这次放宽的重点：以前把路径成分全剥掉，scripts/check.py 会变成
-     * check.py，Skill 的目录结构在取用端就没了。
-     */
-    private String safePath(String original) {
-        if (original == null || original.isBlank()) {
-            throw bad("文件名缺失");
+    private static void validateImage(byte[] bytes, String extension, String path) {
+        boolean signature = switch (extension) {
+            case "png" -> starts(bytes, 137, 80, 78, 71, 13, 10, 26, 10);
+            case "jpg", "jpeg" -> starts(bytes, 255, 216, 255);
+            case "gif" -> starts(bytes, 71, 73, 70, 56, 55, 97) || starts(bytes, 71, 73, 70, 56, 57, 97);
+            case "webp" -> starts(bytes, 82, 73, 70, 70) && bytes.length >= 12 && new String(bytes, 8, 4, StandardCharsets.US_ASCII).equals("WEBP");
+            default -> false;
+        };
+        if (!signature) throw bad("图片实际内容与扩展名不符：" + path);
+        try (MemoryCacheImageInputStream input = new MemoryCacheImageInputStream(new ByteArrayInputStream(bytes))) {
+            Iterator<ImageReader> readers = ImageIO.getImageReaders(input);
+            if (!readers.hasNext()) throw bad("无法识别图片内容：" + path);
+            ImageReader reader = readers.next();
+            try {
+                reader.setInput(input, true, true);
+                String expected = extension.equals("jpg") ? "jpeg" : extension;
+                if (!reader.getFormatName().equalsIgnoreCase(expected)) throw bad("图片格式与扩展名不符：" + path);
+                int width = reader.getWidth(0), height = reader.getHeight(0);
+                if (width <= 0 || height <= 0 || width > 12_000 || height > 12_000 || (long) width * height > MAX_IMAGE_PIXELS) {
+                    throw bad("图片尺寸过大，最多 2000 万像素且单边不超过 12000 像素：" + path);
+                }
+                // Decode a bounded sample without allocating a full-size raster.
+                ImageReadParam param = reader.getDefaultReadParam();
+                param.setSourceSubsampling(Math.max(1, (width + 511) / 512), Math.max(1, (height + 511) / 512), 0, 0);
+                if (reader.read(0, param) == null) throw bad("图片内容不完整：" + path);
+            } finally {
+                reader.dispose();
+            }
+        } catch (IOException | IllegalArgumentException e) {
+            throw bad("图片损坏或内容不完整：" + path);
         }
-        String path = original.replace('\\', '/').trim();
-        if (path.startsWith("/") || path.matches("^[A-Za-z]:.*")) {
-            throw bad("路径必须是相对路径：" + original);
-        }
-        if (path.length() > 400) {
-            throw bad("路径过长");
-        }
+    }
 
-        String[] parts = path.split("/");
-        StringBuilder out = new StringBuilder();
-        int depth = 0;
+    private static void validateText(byte[] bytes, String path) {
+        if (starts(bytes, 77, 90) || starts(bytes, 127, 69, 76, 70) || starts(bytes, 80, 75, 3, 4)
+                || starts(bytes, 202, 254, 186, 190) || starts(bytes, 37, 80, 68, 70) || starts(bytes, 137, 80, 78, 71)) {
+            throw bad("二进制文件不能伪装成文本或脚本：" + path);
+        }
+        Charset charset = starts(bytes, 255, 254) ? StandardCharsets.UTF_16LE
+                : starts(bytes, 254, 255) ? StandardCharsets.UTF_16BE : StandardCharsets.UTF_8;
+        try {
+            String decoded = charset.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString();
+            if (decoded.indexOf('\0') >= 0) throw bad("文本文件包含二进制内容：" + path);
+        } catch (CharacterCodingException e) {
+            throw bad("文本文件须使用 UTF-8 或带 BOM 的 UTF-16 编码：" + path);
+        }
+    }
 
+    static String safePath(String original, int maxDepth) {
+        if (original == null || original.isBlank()) throw bad("文件名缺失");
+        String path = original.replace('\\', '/');
+        if (path.startsWith("/") || path.matches("^[A-Za-z]:.*")) throw bad("路径必须是相对路径：" + original);
+        if (path.length() > 400) throw bad("路径过长");
+        String[] parts = path.split("/", -1);
+        if (parts.length > maxDepth) throw bad("目录层级不能超过 " + maxDepth + " 层：" + original);
         for (String part : parts) {
-            String seg = part.trim();
-            if (seg.isEmpty() || seg.equals(".")) {
-                continue;   // 折叠 a//b 与 ./a
-            }
-            if (seg.equals("..")) {
-                throw bad("路径不能包含 ..：" + original);
-            }
-            if (seg.startsWith(".")) {
-                throw bad("不接受以点开头的文件或目录：" + seg);
-            }
-            if (seg.length() > 200) {
-                throw bad("路径片段过长：" + seg);
-            }
-            // 控制字符与 Windows 保留字符。zip 解到 Windows 上会失败或被改名。
-            if (seg.matches(".*[\\x00-\\x1f<>:\"|?*].*")) {
-                throw bad("路径含非法字符：" + seg);
-            }
-            if (depth++ > 0) {
-                out.append('/');
-            }
-            out.append(seg);
+            if (part.isBlank() || part.startsWith(".") || part.endsWith(".") || part.endsWith(" ")) throw bad("路径不能包含空片段、点目录、隐藏文件或结尾空格：" + original);
+            if (part.length() > 200 || part.matches("(?s).*[\\x00-\\x1f\\x7f<>:\"|?*\\u202a-\\u202e\\u2066-\\u2069].*")) throw bad("路径含非法字符或片段过长：" + original);
+            if (part.matches("(?i)(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\\..*)?")) throw bad("路径不能使用系统保留名称：" + original);
         }
-
-        if (out.length() == 0) {
-            throw bad("路径不合法：" + original);
-        }
-        if (depth > MAX_DEPTH) {
-            throw bad("目录层级不能超过 " + MAX_DEPTH + " 层：" + original);
-        }
-        return out.toString();
+        return String.join("/", parts);
     }
 
-    private String extensionOf(String path) {
-        String name = path.substring(path.lastIndexOf('/') + 1);
+    static String extensionOf(String path) {
+        String name = path.substring(path.lastIndexOf('/') + 1).toLowerCase(Locale.ROOT);
+        if (name.equals("env.example")) return name;
         int dot = name.lastIndexOf('.');
-        if (dot < 0 || dot == name.length() - 1) {
-            throw bad("文件名缺少扩展名：" + name);
-        }
-        return name.substring(dot + 1).toLowerCase(Locale.ROOT);
+        if (dot < 0 || dot == name.length() - 1) throw bad("文件名缺少扩展名：" + name);
+        return name.substring(dot + 1);
     }
 
-    private ResponseStatusException bad(String message) {
-        return new ResponseStatusException(HttpStatus.BAD_REQUEST, message);
+    static boolean starts(byte[] bytes, int... prefix) {
+        if (bytes.length < prefix.length) return false;
+        for (int i = 0; i < prefix.length; i++) if ((bytes[i] & 255) != prefix[i]) return false;
+        return true;
     }
+    static ResponseStatusException bad(String message) { return new ResponseStatusException(HttpStatus.BAD_REQUEST, message); }
+    static ResponseStatusException tooLarge(String message) { return new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, message); }
 }

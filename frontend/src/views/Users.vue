@@ -191,7 +191,6 @@ const formData = ref<UserFormData>({
 const roleOptions = [
   { label: '普通成员', value: 'USER' },
   { label: '作者', value: 'AUTHOR' },
-  { label: '审批人', value: 'APPROVER' },
   { label: '管理员', value: 'ADMIN' }
 ]
 
@@ -310,7 +309,7 @@ const closeDialogs = () => {
 const getRoleLabel = (role: string) => {
   const labels: Record<string, string> = {
     ADMIN: '管理员',
-    APPROVER: '审批人',
+    APPROVER: '作者',
     AUTHOR: '作者',
     USER: '成员'
   }

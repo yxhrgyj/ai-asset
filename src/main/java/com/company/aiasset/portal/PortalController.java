@@ -64,6 +64,19 @@ public class PortalController {
                 "size", found.getSize());
     }
 
+    @GetMapping("/download-ranking")
+    public List<PortalDto.AssetSummary> downloadRanking(
+            @RequestParam(required = false) Asset.Type type,
+            @RequestParam(defaultValue = "5") int limit) {
+        return assets.findDownloadRanking(type == null ? null : type.name(), Math.max(1, Math.min(limit, 20)))
+                .stream()
+                .map(asset -> versions.findLatestPublished(asset.getId())
+                        .map(version -> PortalDto.AssetSummary.of(asset, version))
+                        .orElse(null))
+                .filter(summary -> summary != null)
+                .toList();
+    }
+
     @GetMapping("/assets/{id}")
     public PortalDto.AssetDetail detail(@PathVariable UUID id,
                                         @RequestParam(required = false) Integer versionNo) {

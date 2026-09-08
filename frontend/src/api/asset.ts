@@ -82,6 +82,16 @@ export interface SaveDraftRequest {
 
 const BASE = '/api'
 
+async function responseError(res: Response): Promise<Error> {
+  const text = await res.text()
+  try {
+    const body = JSON.parse(text)
+    return new Error(body.message || body.detail || body.error || `HTTP ${res.status}`)
+  } catch {
+    return new Error(text || `HTTP ${res.status}`)
+  }
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...options,
@@ -93,8 +103,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   })
 
   if (!res.ok) {
-    const text = await res.text()
-    throw new Error(text || `HTTP ${res.status}`)
+    throw await responseError(res)
   }
 
   if (res.status === 204) {
@@ -192,8 +201,7 @@ export const assetApi = {
     })
 
     if (!res.ok) {
-      const text = await res.text()
-      throw new Error(text || `HTTP ${res.status}`)
+      throw await responseError(res)
     }
 
     return res.json()

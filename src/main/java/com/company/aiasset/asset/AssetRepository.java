@@ -161,6 +161,20 @@ public interface AssetRepository extends JpaRepository<Asset, UUID> {
 
     List<Asset> findByArchivedFalse();
 
+    /** Filter visibility before limiting, and use stable tie breakers. */
+    @Query(value = """
+            SELECT * FROM assets a
+            WHERE a.archived = false AND a.download_count > 0
+              AND (:type IS NULL OR a.type = :type)
+              AND EXISTS (
+                  SELECT 1 FROM asset_versions v
+                  WHERE v.asset_id = a.id AND v.status = 'PUBLISHED'
+              )
+            ORDER BY a.download_count DESC, a.updated_at DESC, a.id ASC
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<Asset> findDownloadRanking(@Param("type") String type, @Param("limit") int limit);
+
     /**
      * 查找指定类型和作用域的未归档资产
      */

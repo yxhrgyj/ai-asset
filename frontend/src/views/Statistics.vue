@@ -42,7 +42,6 @@
         <section aria-label="协作概览" class="collaboration-metrics">
           <div><Users :size="16" aria-hidden="true" /><span>用户数</span><strong class="metric-value">{{ formatNumber(overview.totalUsers) }}</strong></div>
           <div><UsersRound :size="16" aria-hidden="true" /><span>团队数量</span><strong class="metric-value">{{ formatNumber(teamCount) }}</strong></div>
-          <div><ClipboardCheck :size="16" aria-hidden="true" /><span>待审批</span><strong class="metric-value pending-count">{{ formatNumber(overview.pendingApprovals) }}</strong></div>
         </section>
 
         <section class="workbench-section" aria-labelledby="popular-title">
@@ -98,7 +97,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
-import { Library, CircleCheck, FilePenLine, Download, Users, UsersRound, ClipboardCheck, FolderKanban, UserRoundCog, RefreshCw, ChevronRight, CircleAlert } from '@lucide/vue'
+import { Library, CircleCheck, FilePenLine, Download, Users, UsersRound, FolderKanban, UserRoundCog, RefreshCw, ChevronRight, CircleAlert } from '@lucide/vue'
 import { statisticsApi, type OverviewStats, type PopularAsset, type ActiveUser, type DownloadRecord } from '../api/statistics'
 import { teamApi } from '../api/team'
 import { useAuthStore } from '../stores/auth'
@@ -117,7 +116,6 @@ const actions = computed(() => [
   { to: '/admin/assets', label: '资产库', icon: Library, tone: 'blue' },
   { to: '/admin/projects', label: '项目管理', icon: FolderKanban, tone: 'cyan' },
   { to: '/admin/teams', label: '团队管理', icon: UsersRound, tone: 'green' },
-  ...(auth.canApprove() ? [{ to: '/admin/approvals', label: '审批管理', icon: ClipboardCheck, tone: 'amber' }] : []),
   ...(auth.isAdmin() ? [{ to: '/admin/users', label: '用户管理', icon: UserRoundCog, tone: 'neutral' }] : [])
 ])
 const metrics = computed(() => overview.value ? [

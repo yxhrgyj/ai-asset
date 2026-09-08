@@ -40,14 +40,9 @@ export const useAuthStore = defineStore('auth', () => {
     return ['AUTHOR', 'APPROVER', 'ADMIN'].includes(user.value.role)
   }
 
-  function canApprove(): boolean {
-    if (!user.value) return false
-    return ['APPROVER', 'ADMIN'].includes(user.value.role)
-  }
-
   function isAdmin(): boolean {
     return user.value?.role === 'ADMIN'
   }
 
-  return { user, loading, login, logout, fetchMe, changePassword, canAuthor, canApprove, isAdmin }
+  return { user, loading, login, logout, fetchMe, changePassword, canAuthor, isAdmin }
 })

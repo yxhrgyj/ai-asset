@@ -53,8 +53,7 @@ public class StatisticsController {
             long publishedAssets,
             long draftAssets,
             long totalDownloads,
-            long totalUsers,
-            long pendingApprovals
+            long totalUsers
     ) {}
 
     public record PopularAssetStats(

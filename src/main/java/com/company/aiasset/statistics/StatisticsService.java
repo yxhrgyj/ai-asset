@@ -1,6 +1,5 @@
 package com.company.aiasset.statistics;
 
-import com.company.aiasset.approval.ApprovalRepository;
 import com.company.aiasset.asset.AssetDownloadRepository;
 import com.company.aiasset.asset.AssetRepository;
 import com.company.aiasset.asset.AssetVersionRepository;
@@ -17,18 +16,15 @@ public class StatisticsService {
     private final AssetVersionRepository versions;
     private final AssetDownloadRepository downloads;
     private final UserRepository users;
-    private final ApprovalRepository approvals;
 
     public StatisticsService(AssetRepository assets,
                             AssetVersionRepository versions,
                             AssetDownloadRepository downloads,
-                            UserRepository users,
-                            ApprovalRepository approvals) {
+                            UserRepository users) {
         this.assets = assets;
         this.versions = versions;
         this.downloads = downloads;
         this.users = users;
-        this.approvals = approvals;
     }
 
     public StatisticsController.OverviewStats getOverview() {
@@ -37,15 +33,13 @@ public class StatisticsService {
         long draftAssets = versions.countByStatus("DRAFT");
         long totalDownloads = downloads.count();
         long totalUsers = users.count();
-        long pendingApprovals = approvals.countPending();
 
         return new StatisticsController.OverviewStats(
                 totalAssets,
                 publishedAssets,
                 draftAssets,
                 totalDownloads,
-                totalUsers,
-                pendingApprovals
+                totalUsers
         );
     }
 

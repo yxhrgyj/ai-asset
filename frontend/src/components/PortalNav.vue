@@ -1,5 +1,5 @@
 <template>
-  <nav class="portal-nav" :class="{ 'is-open': open }" aria-label="门户导航">
+  <nav id="portal-navigation" class="portal-nav" :class="{ 'is-open': open }" aria-label="门户导航">
     <RouterLink to="/" class="portal-nav-link" exact-active-class="is-active" @click="close">
       首页
     </RouterLink>

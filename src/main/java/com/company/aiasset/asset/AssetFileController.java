@@ -78,7 +78,7 @@ public class AssetFileController {
         AssetFile f = new AssetFile();
         f.setAssetVersionId(v.getId());
         f.setRelativePath(name);
-        f.setMimeType(file.getContentType());
+        f.setMimeType(policy.mediaType(name));
         f.setSizeBytes(stored.sizeBytes());
         f.setContentHash(stored.sha256());
         f.setStorageKey(stored.storageKey());
@@ -93,8 +93,9 @@ public class AssetFileController {
      */
     @GetMapping("/{fileId}")
     public ResponseEntity<InputStreamResource> download(@PathVariable UUID assetId,
-                                                        @PathVariable UUID fileId) throws IOException {
-        service.mustFind(assetId);
+                                                        @PathVariable UUID fileId,
+                                                        CurrentUser current) throws IOException {
+        Asset asset = service.mustFind(assetId);
         AssetFile f = files.findById(fileId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "附件不存在"));
 
@@ -104,6 +105,7 @@ public class AssetFileController {
         if (!v.getAssetId().equals(assetId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "附件不存在");
         }
+        service.requireReadableVersion(asset, v, current);
         if (f.getStorageKey() == null || !storage.exists(f.getStorageKey())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "附件内容缺失");
         }
@@ -123,7 +125,8 @@ public class AssetFileController {
      */
     @GetMapping("/download-all")
     public ResponseEntity<InputStreamResource> downloadAll(@PathVariable UUID assetId,
-                                                           @RequestParam(required = false) UUID versionId) throws IOException {
+                                                           @RequestParam(required = false) UUID versionId,
+                                                           CurrentUser current) throws IOException {
         Asset asset = service.mustFind(assetId);
 
         // 如果没指定版本，使用最新已发布版本或草稿
@@ -145,6 +148,7 @@ public class AssetFileController {
             }
         }
 
+        service.requireReadableVersion(asset, version, current);
         List<AssetFile> fileList = files.findByAssetVersionIdOrderByRelativePath(version.getId());
         if (fileList.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "该版本没有附件");

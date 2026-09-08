@@ -1,6 +1,8 @@
 import { apiClient } from './client'
 import type {
   AssetDetail,
+  AssetSummary,
+  PortalAssetType,
   AssetListParams,
   AssetListResponse,
   Statistics
@@ -22,6 +24,12 @@ export const portalApi = {
   getAssetDetail(id: string, versionNo?: number): Promise<AssetDetail> {
     const query = versionNo === undefined ? '' : `?versionNo=${versionNo}`
     return apiClient.get<AssetDetail>(`/public/assets/${id}${query}`)
+  },
+
+  getDownloadRanking(type?: PortalAssetType, limit = 5): Promise<AssetSummary[]> {
+    const query = new URLSearchParams({ limit: String(limit) })
+    if (type) query.set('type', type)
+    return apiClient.get<AssetSummary[]>(`/public/download-ranking?${query}`)
   },
 
   getStatistics(): Promise<Statistics> {

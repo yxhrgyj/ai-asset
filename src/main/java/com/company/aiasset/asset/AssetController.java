@@ -6,6 +6,8 @@ import jakarta.validation.constraints.Size;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -60,8 +62,7 @@ public class AssetController {
     }
 
     /**
-     * 详情。默认展示最新已发布版本；没有已发布版本时（新建后还没发过）
-     * 退回展示草稿，否则作者看不到自己刚写的东西。
+     * 作者和管理员默认查看当前草稿；其他用户只能查看已发布版本。
      */
     @GetMapping("/{id}")
     public AssetDto.Detail detail(@PathVariable UUID id,
@@ -69,16 +70,21 @@ public class AssetController {
                                   CurrentUser current) {
         Asset a = service.mustFind(id);
         List<AssetVersion> all = service.versionsOf(id);
-
-        AssetVersion shown = versionNo != null
-                ? all.stream().filter(v -> v.getVersionNo() == versionNo).findFirst()
-                      .orElseThrow(() -> new IllegalArgumentException("版本不存在：" + versionNo))
-                : all.stream().filter(v -> v.getStatus() == AssetVersion.Status.PUBLISHED).findFirst()
-                      .orElse(all.isEmpty() ? null : all.get(0));
-
         boolean canEdit = current.canAuthor()
                 && (a.getOwnerUserId().equals(current.user().getId())
                     || current.user().getRole() == User.Role.ADMIN);
+        if (!canEdit) {
+            if (a.isArchived()) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "资产已归档");
+            all = all.stream().filter(v -> v.getStatus() == AssetVersion.Status.PUBLISHED).toList();
+        }
+
+        AssetVersion shown = versionNo != null
+                ? all.stream().filter(v -> v.getVersionNo() == versionNo).findFirst()
+                      .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "版本不存在"))
+                : canEdit ? all.stream().filter(v -> v.getStatus() == AssetVersion.Status.DRAFT).findFirst()
+                      .orElse(all.isEmpty() ? null : all.get(0))
+                : (all.isEmpty() ? null : all.get(0));
+        if (shown == null && !canEdit) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "没有可读取的版本");
 
         return new AssetDto.Detail(
                 AssetDto.of(a),

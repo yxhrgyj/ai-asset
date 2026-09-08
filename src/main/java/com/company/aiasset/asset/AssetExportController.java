@@ -1,6 +1,7 @@
 package com.company.aiasset.asset;
 
 import com.company.aiasset.storage.FileStorage;
+import com.company.aiasset.security.CurrentUser;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -49,7 +50,8 @@ public class AssetExportController {
 
     @GetMapping("/export")
     public ResponseEntity<StreamingResponseBody> export(@PathVariable UUID assetId,
-                                                        @RequestParam(required = false) Integer versionNo) {
+                                                        @RequestParam(required = false) Integer versionNo,
+                                                        CurrentUser current) {
         Asset a = service.mustFind(assetId);
         List<AssetVersion> all = service.versionsOf(assetId);
 
@@ -60,6 +62,7 @@ public class AssetExportController {
                       .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT,
                               "尚无已发布版本可导出"));
 
+        service.requireReadableVersion(a, v, current);
         List<AssetFile> attachments = files.findByAssetVersionIdOrderByRelativePath(v.getId());
         String zipName = a.getSlug() + "-v" + v.getVersionNo() + ".zip";
 

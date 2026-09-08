@@ -11,7 +11,7 @@
 
     <form class="portal-filter-bar" @submit.prevent="submitFilters">
       <label class="portal-search-field">
-        <span class="portal-search-icon" aria-hidden="true">⌕</span>
+        <Search class="portal-search-icon" :size="20" aria-hidden="true" />
         <span class="sr-only">搜索资产</span>
         <input v-model="search" type="search" placeholder="搜索名称、简介或标签" />
       </label>
@@ -33,7 +33,7 @@
           <option value="PROJECT">项目级</option>
         </select>
       </label>
-      <button class="portal-button portal-button-primary portal-filter-submit" type="submit">搜索 <span aria-hidden="true">→</span></button>
+      <button class="portal-button portal-button-primary portal-filter-submit" type="submit">搜索 <ArrowRight :size="17" aria-hidden="true" /></button>
     </form>
 
     <div v-if="error" class="portal-alert" role="alert">{{ error }} <button type="button" @click="loadAssets">重试</button></div>
@@ -45,34 +45,22 @@
       <button type="button" class="portal-button portal-button-quiet" @click="clearFilters">清除筛选</button>
     </div>
     <div v-else class="portal-asset-grid portal-asset-grid-library">
-      <RouterLink v-for="asset in items" :key="asset.id" :to="`/assets-public/${asset.id}`" class="portal-asset-card">
-        <div class="portal-asset-card-top">
-          <span class="portal-type-mark" :class="`is-${asset.type.toLowerCase()}`">{{ typeLabel(asset.type) }}</span>
-          <span class="portal-download-count" aria-label="下载次数">↓ {{ asset.downloadCount }}</span>
-        </div>
-        <h2>{{ asset.name }}</h2>
-        <p>{{ asset.summary || '这项资产没有附带摘要，请进入详情查看公开内容。' }}</p>
-        <div v-if="asset.tags.length" class="portal-tag-row">
-          <span v-for="tag in asset.tags.slice(0, 3)" :key="tag">#{{ tag }}</span>
-        </div>
-        <div class="portal-asset-card-foot">
-          <span>{{ scopeLabel(asset.scope) }}</span>
-          <span>{{ formatDate(asset.publishedAt) }}</span>
-        </div>
-      </RouterLink>
+      <PortalAssetCard v-for="asset in items" :key="asset.id" :asset="asset" heading-tag="h2" />
     </div>
 
     <nav v-if="total > size" class="portal-pagination" aria-label="资产分页">
-      <button type="button" class="portal-pagination-button" aria-label="上一页" :disabled="page === 0 || loading" @click="changePage(page - 1)">←</button>
+      <button type="button" class="portal-pagination-button" aria-label="上一页" :disabled="page === 0 || loading" @click="changePage(page - 1)"><ArrowLeft :size="18" aria-hidden="true" /></button>
       <span>{{ page + 1 }} / {{ totalPages }}</span>
-      <button type="button" class="portal-pagination-button" aria-label="下一页" :disabled="page >= totalPages - 1 || loading" @click="changePage(page + 1)">→</button>
+      <button type="button" class="portal-pagination-button" aria-label="下一页" :disabled="page >= totalPages - 1 || loading" @click="changePage(page + 1)"><ArrowRight :size="18" aria-hidden="true" /></button>
     </nav>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { ArrowLeft, ArrowRight, Search } from '@lucide/vue'
+import PortalAssetCard from '../components/PortalAssetCard.vue'
 import { portalApi } from '../api/portal'
 import { normalizePortalFilters } from '../lib/portal-navigation'
 import type { AssetSummary, PortalAssetScope, PortalAssetType } from '../types/portal'
@@ -155,16 +143,4 @@ async function clearFilters() {
   await syncQuery()
 }
 
-function typeLabel(value: AssetSummary['type']) {
-  return value === 'RULE' ? 'RULE' : value === 'SKILL' ? 'SKILL' : 'DOC'
-}
-
-function scopeLabel(value: AssetSummary['scope']) {
-  return value === 'ORGANIZATION' ? '组织级' : value === 'TECH_STACK' ? '技术栈' : '项目级'
-}
-
-function formatDate(value: string | null) {
-  if (!value) return '尚未记录'
-  return new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(value))
-}
 </script>

@@ -13,31 +13,23 @@
           返回
         </button>
         <div class="header-actions" v-if="detail?.canEdit">
-          <button v-if="!isDraft" @click="createNewDraft" class="btn-secondary">
+          <button v-if="!isDraft && !hasDraft" @click="createNewDraft" class="btn-secondary">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="12" y1="5" x2="12" y2="19"/>
               <line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
             创建新版本
           </button>
-          <button v-if="isDraft" @click="showEditor = true" class="btn-primary">
+          <button v-if="isDraft" @click="openEditor" class="btn-primary">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
             </svg>
             编辑内容
           </button>
-          <button v-if="isDraft" @click="submitForApproval" class="btn-primary">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
-            提交审批
-          </button>
-          <button v-if="isPending" @click="withdrawApproval" class="btn-secondary">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M3 12h18M12 5l7 7-7 7"/>
-            </svg>
-            撤回审批
+          <button v-if="isDraft" @click="publishAsset" class="btn-primary" :disabled="publishing || !hasContent">
+            <CircleCheck :size="18" aria-hidden="true" />
+            {{ publishing ? '发布中...' : '发布资产' }}
           </button>
           <button v-if="isDraft" @click="archiveAsset" class="btn-danger">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -99,9 +91,9 @@
 
       <!-- 版本切换 -->
       <div v-if="detail?.versions && detail.versions.length > 0" class="version-selector">
-        <label class="selector-label">查看版本：</label>
-        <select v-model="selectedVersionNo" @change="loadVersion" class="version-select">
-          <option :value="null">最新已发布版本</option>
+        <label class="selector-label" for="asset-version-select">查看版本：</label>
+        <select id="asset-version-select" v-model="selectedVersionNo" @change="loadVersion" class="version-select">
+          <option :value="null">{{ detail.canEdit && hasDraft ? '当前草稿' : '最新版本' }}</option>
           <option v-for="v in detail.versions" :key="v.id" :value="v.versionNo">
             v{{ v.versionNo }} - {{ getStatusLabel(v.status) }} - {{ formatDate(v.createdAt) }}
           </option>
@@ -118,7 +110,7 @@
 
       <div v-else class="empty-content">
         <p>暂无内容</p>
-        <button v-if="detail?.canEdit && isDraft" @click="showEditor = true" class="btn-primary">
+        <button v-if="detail?.canEdit && isDraft" @click="openEditor" class="btn-primary">
           开始编辑
         </button>
       </div>
@@ -179,42 +171,6 @@
 
         <div v-else class="empty-files">
           <p>暂无附件</p>
-        </div>
-      </div>
-
-      <!-- 审批流程 -->
-      <div v-if="isPending && approvalHistory.length > 0" class="approval-section">
-        <h2 class="section-title">审批流程</h2>
-        <div class="approval-flow">
-          <div class="flow-item">
-            <div class="flow-status flow-completed">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-              </svg>
-            </div>
-            <div class="flow-content">
-              <div class="flow-title">提交审批</div>
-              <div class="flow-meta">
-                <span>{{ approvalHistory[0]?.submittedByName || '未知' }}</span>
-                <span class="flow-time">{{ formatDateTime(approvalHistory[0]?.submittedAt) }}</span>
-              </div>
-            </div>
-          </div>
-          <div class="flow-arrow">→</div>
-          <div class="flow-item">
-            <div class="flow-status flow-pending">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"/>
-                <polyline points="12 6 12 12 16 14"/>
-              </svg>
-            </div>
-            <div class="flow-content">
-              <div class="flow-title">待审批</div>
-              <div class="flow-meta">
-                <span class="flow-waiting">等待审批人处理</span>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -308,17 +264,20 @@
                   <input
                     type="file"
                     ref="editorFileInput"
+                    :accept="UPLOAD_ACCEPT"
+                    :disabled="editorUploading"
                     @change="handleEditorFileSelect"
                     class="file-input"
                     multiple
                     style="display: none"
                   />
-                  <button @click="editorFileInput?.click()" class="btn-primary btn-sm">
+                  <button @click="editorFileInput?.click()" class="btn-primary btn-sm" :disabled="editorUploading">
                     添加附件
                   </button>
                 </div>
 
                 <!-- 待上传文件列表 -->
+                <div class="file-input-hint">{{ UPLOAD_HINT }}</div>
                 <div v-if="editorSelectedFiles.length > 0" class="pending-files">
                   <h4>待上传文件</h4>
                   <div v-for="(item, index) in editorSelectedFiles" :key="'pending-' + index" class="file-item pending">
@@ -329,12 +288,13 @@
                     <div class="file-path">
                       <input
                         v-model="item.relativePath"
+                        :disabled="editorUploading"
                         type="text"
                         class="form-input form-input-sm"
                         placeholder="相对路径（可选）"
                       />
                     </div>
-                    <button @click="removeEditorSelectedFile(index)" class="btn-icon-sm">×</button>
+                    <button @click="removeEditorSelectedFile(index)" class="btn-icon-sm" :disabled="editorUploading" aria-label="移除待上传文件" title="移除待上传文件">×</button>
                   </div>
                   <button @click="uploadEditorFiles" class="btn-primary btn-sm" :disabled="editorUploading">
                     {{ editorUploading ? '上传中...' : '上传' }}
@@ -353,7 +313,7 @@
                       <a :href="assetApi.downloadFile(asset!.id, file.id)" target="_blank" class="btn-icon-sm">
                         ↓
                       </a>
-                      <button @click="deleteFile(file.id)" class="btn-icon-sm danger">×</button>
+                      <button @click="deleteFile(file.id)" class="btn-icon-sm danger" :disabled="editorUploading" aria-label="删除附件" title="删除附件">×</button>
                     </div>
                   </div>
                 </div>
@@ -365,50 +325,9 @@
 
             <div v-if="editorError" class="error-message">{{ editorError }}</div>
             <div class="dialog-footer">
-              <button @click="closeEditor" class="btn-secondary">取消</button>
-              <button @click="saveDraft" class="btn-primary">保存草稿</button>
+              <button @click="closeEditor" class="btn-secondary" :disabled="editorUploading">取消</button>
+              <button @click="saveDraft" class="btn-primary" :disabled="editorUploading">保存草稿</button>
             </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 提交审批对话框 -->
-      <div v-if="showApprovalDialog" class="dialog-overlay" @click="cancelSubmitApproval">
-        <div class="dialog" @click.stop>
-          <div class="dialog-header">
-            <h2>提交审批</h2>
-            <button @click="cancelSubmitApproval" class="btn-close">×</button>
-          </div>
-          <div class="dialog-body">
-            <div class="approval-info">
-              <div class="info-row">
-                <span class="info-label">资产名称</span>
-                <span class="info-value">{{ asset?.name }}</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">当前版本</span>
-                <span class="info-value">v{{ currentVersion?.versionNo }}</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">提交说明</span>
-                <span class="info-hint">提交后将无法编辑，直到审批完成</span>
-              </div>
-            </div>
-            <div class="form-group">
-              <label class="form-label">备注（可选）</label>
-              <textarea
-                v-model="approvalComment"
-                class="form-textarea"
-                placeholder="可添加备注说明..."
-                rows="3"
-              />
-            </div>
-          </div>
-          <div class="dialog-footer">
-            <button @click="cancelSubmitApproval" class="btn-secondary" :disabled="submittingApproval">取消</button>
-            <button @click="confirmSubmitApproval" class="btn-primary" :disabled="submittingApproval">
-              {{ submittingApproval ? '提交中...' : '确认提交' }}
-            </button>
           </div>
         </div>
       </div>
@@ -426,12 +345,14 @@
               <input
                 type="file"
                 ref="fileInput"
+                :accept="UPLOAD_ACCEPT"
+                :disabled="uploading"
                 @change="handleFileSelect"
                 class="file-input"
                 multiple
               />
               <div class="file-input-hint">
-                支持的文件类型：.md, .py, .js, .sh, .json, .yaml, .txt 等文本文件及脚本
+                {{ UPLOAD_HINT }}
               </div>
             </div>
 
@@ -445,12 +366,13 @@
                   <label class="form-label-sm">相对路径（可选）</label>
                   <input
                     v-model="item.relativePath"
+                    :disabled="uploading"
                     type="text"
                     class="form-input form-input-sm"
                     placeholder="例如: scripts/check.py"
                   />
                 </div>
-                <button @click="removeSelectedFile(index)" class="btn-icon-sm">
+                <button @click="removeSelectedFile(index)" class="btn-icon-sm" :disabled="uploading" aria-label="移除文件" title="移除文件">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="18" y1="6" x2="6" y2="18"/>
                     <line x1="6" y1="6" x2="18" y2="18"/>
@@ -489,9 +411,10 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { assetApi, type AssetDetail, type AssetType, type AssetScope, type AssetFile } from '../api/asset'
-import { approvalApi } from '../api/approval'
+import { CircleCheck } from '@lucide/vue'
+import { UPLOAD_ACCEPT, UPLOAD_HINT, validateUploads } from '../lib/asset-upload'
 import MainLayout from '../components/MainLayout.vue'
-import { marked } from 'marked'
+import { renderMarkdown } from '../lib/markdown'
 import { useDialog } from '../composables/useDialog'
 import { MdEditor } from 'md-editor-v3'
 import 'md-editor-v3/lib/style.css'
@@ -519,7 +442,7 @@ const uploadError = ref('')
 const uploading = ref(false)
 const uploadProgress = ref(0)
 
-const approvalHistory = ref<any[]>([])
+const publishing = ref(false)
 
 const asset = computed(() => detail.value?.asset)
 const currentVersion = computed(() => detail.value?.currentVersion)
@@ -528,9 +451,7 @@ const isDraft = computed(() =>
   currentVersion.value?.status === 'DRAFT'
 )
 
-const isPending = computed(() =>
-  currentVersion.value?.status === 'PENDING'
-)
+const hasDraft = computed(() => detail.value?.versions.some(version => version.status === 'DRAFT'))
 
 const hasContent = computed(() => {
   const hasBody = detail.value?.body && detail.value.body.trim().length > 0
@@ -540,11 +461,12 @@ const hasContent = computed(() => {
 
 const renderedBody = computed(() => {
   if (!detail.value?.body) return ''
-  return marked(detail.value.body)
+  return renderMarkdown(detail.value.body)
 })
 
 watch(() => route.params.id, () => {
   if (route.params.id) {
+    selectedVersionNo.value = null
     loadAsset()
   }
 })
@@ -557,26 +479,10 @@ const loadAsset = async () => {
   loading.value = true
   try {
     detail.value = await assetApi.get(route.params.id as string)
-    if (detail.value?.body) {
-      editorContent.value = detail.value.body
-    }
-    // 加载审批历史
-    if (currentVersion.value?.id) {
-      await loadApprovalHistory()
-    }
   } catch (err: any) {
     console.error('Failed to load asset:', err)
   } finally {
     loading.value = false
-  }
-}
-
-const loadApprovalHistory = async () => {
-  if (!currentVersion.value?.id) return
-  try {
-    approvalHistory.value = await approvalApi.getVersionApprovals(currentVersion.value.id)
-  } catch (err: any) {
-    console.error('Failed to load approval history:', err)
   }
 }
 
@@ -597,15 +503,21 @@ const loadVersion = async () => {
 
 const createNewDraft = async () => {
   try {
-    await assetApi.newDraft(route.params.id as string)
-    await loadAsset()
-    showEditor.value = true
+    const draft = await assetApi.newDraft(route.params.id as string)
+    selectedVersionNo.value = draft.versionNo
+    await loadVersion()
+    openEditor()
   } catch (err: any) {
     await alert({ message: err.message || '创建草稿失败', type: 'error' })
   }
 }
 
 const saveDraft = async () => {
+  if (editorUploading.value) return
+  if (editorSelectedFiles.value.length) {
+    editorError.value = '请先上传或移除待上传附件'
+    return
+  }
   editorError.value = ''
   try {
     await assetApi.saveDraft(route.params.id as string, {
@@ -625,74 +537,34 @@ const saveDraft = async () => {
   }
 }
 
-const showApprovalDialog = ref(false)
-const approvalComment = ref('')
-const submittingApproval = ref(false)
-
-const submitForApproval = async () => {
-  if (!hasContent.value) {
-    await alert({ message: '请先编辑并保存内容后再提交审批', type: 'warning' })
-    return
-  }
-  showApprovalDialog.value = true
-}
-
-const confirmSubmitApproval = async () => {
-  submittingApproval.value = true
-  try {
-    await approvalApi.submit(route.params.id as string)
-    // 提交审批后重新加载，保持当前选择的版本
-    if (selectedVersionNo.value !== null) {
-      await loadVersion()
-    } else {
-      await loadAsset()
-    }
-    showApprovalDialog.value = false
-    approvalComment.value = ''
-    await alert({ message: '已提交审批，请等待审批人处理', type: 'success' })
-  } catch (err: any) {
-    await alert({ message: err.message || '提交失败', type: 'error' })
-  } finally {
-    submittingApproval.value = false
-  }
-}
-
-const cancelSubmitApproval = () => {
-  showApprovalDialog.value = false
-  approvalComment.value = ''
-}
-
-const withdrawApproval = async () => {
+const publishAsset = async () => {
+  if (publishing.value || !hasContent.value || !isDraft.value) return
+  publishing.value = true
   const confirmed = await confirm({
-    message: '确认撤回审批？撤回后版本将回到草稿状态。',
+    message: `确认发布「${asset.value?.name}」v${currentVersion.value?.versionNo}？发布后将在门户公开，后续修改需创建新版本。`,
     type: 'warning'
   })
-  if (!confirmed) return
-
+  if (!confirmed) { publishing.value = false; return }
   try {
-    // 需要先获取当前版本的审批记录
-    const approvals = await approvalApi.getVersionApprovals(currentVersion.value!.id)
-    const pendingApproval = approvals.find(a => !a.decidedAt)
-
-    if (!pendingApproval) {
-      await alert({ message: '未找到待审批记录', type: 'error' })
-      return
-    }
-
-    await approvalApi.withdraw(pendingApproval.id)
-    // 撤回后重新加载，保持当前选择的版本
-    if (selectedVersionNo.value !== null) {
-      await loadVersion()
-    } else {
-      await loadAsset()
-    }
-    await alert({ message: '已撤回审批', type: 'success' })
+    const version = await assetApi.publish(route.params.id as string)
+    selectedVersionNo.value = version.versionNo
+    await loadVersion()
+    await alert({ message: '资产已发布', type: 'success' })
   } catch (err: any) {
-    await alert({ message: err.message || '撤回失败', type: 'error' })
+    await alert({ message: err.message || '发布失败', type: 'error' })
+  } finally {
+    publishing.value = false
   }
+}
+
+const openEditor = () => {
+  editorContent.value = detail.value?.body || ''
+  editorChangelog.value = currentVersion.value?.changelog || ''
+  showEditor.value = true
 }
 
 const closeEditor = () => {
+  if (editorUploading.value) return
   showEditor.value = false
   editorChangelog.value = ''
   editorError.value = ''
@@ -709,7 +581,10 @@ const handleEditorFileSelect = (event: Event) => {
     file,
     relativePath: file.name
   }))
-  editorSelectedFiles.value = [...editorSelectedFiles.value, ...newFiles]
+  const selected = [...editorSelectedFiles.value, ...newFiles]
+  input.value = ''
+  editorError.value = validateUploads(selected)
+  if (!editorError.value) editorSelectedFiles.value = selected
 }
 
 const removeEditorSelectedFile = (index: number) => {
@@ -717,18 +592,22 @@ const removeEditorSelectedFile = (index: number) => {
 }
 
 const uploadEditorFiles = async () => {
-  if (editorSelectedFiles.value.length === 0) return
+  if (editorUploading.value || editorSelectedFiles.value.length === 0) return
+  editorError.value = validateUploads(editorSelectedFiles.value)
+  if (editorError.value) return
 
   editorUploading.value = true
   editorError.value = ''
 
   try {
-    for (const item of editorSelectedFiles.value) {
+    while (editorSelectedFiles.value.length) {
+      const item = editorSelectedFiles.value[0]
       await assetApi.uploadFile(
         route.params.id as string,
         item.file,
         item.relativePath !== item.file.name ? item.relativePath : undefined
       )
+      editorSelectedFiles.value.shift()
     }
 
     // 上传成功后重新加载资产详情
@@ -752,10 +631,13 @@ const handleFileSelect = (event: Event) => {
   if (!input.files) return
 
   const files = Array.from(input.files)
-  selectedFiles.value = files.map(file => ({
+  const selected = files.map(file => ({
     file,
     relativePath: file.name
   }))
+  input.value = ''
+  uploadError.value = validateUploads(selected)
+  if (!uploadError.value) selectedFiles.value = selected
 }
 
 const removeSelectedFile = (index: number) => {
@@ -763,7 +645,9 @@ const removeSelectedFile = (index: number) => {
 }
 
 const uploadFiles = async () => {
-  if (selectedFiles.value.length === 0) return
+  if (uploading.value || selectedFiles.value.length === 0) return
+  uploadError.value = validateUploads(selectedFiles.value)
+  if (uploadError.value) return
 
   uploading.value = true
   uploadError.value = ''
@@ -771,17 +655,19 @@ const uploadFiles = async () => {
 
   try {
     const total = selectedFiles.value.length
-    for (let i = 0; i < total; i++) {
-      const item = selectedFiles.value[i]
+    while (selectedFiles.value.length) {
+      const item = selectedFiles.value[0]
       await assetApi.uploadFile(
         route.params.id as string,
         item.file,
         item.relativePath !== item.file.name ? item.relativePath : undefined
       )
-      uploadProgress.value = Math.round(((i + 1) / total) * 100)
+      selectedFiles.value.shift()
+      uploadProgress.value = Math.round(((total - selectedFiles.value.length) / total) * 100)
     }
 
-    await loadAsset()
+    await loadVersion()
+    uploading.value = false
     closeUploadDialog()
   } catch (err: any) {
     uploadError.value = err.message || '上传失败'
@@ -826,56 +712,39 @@ const archiveAsset = async () => {
   }
 }
 
-const getDownloadUrl = (file: AssetFile) => {
-  return assetApi.downloadFile(route.params.id as string, file.id)
-}
-
-const downloadSingleFile = async (file: AssetFile) => {
-  // 记录下载次数
+const downloadAttachment = async (url: string, filename: string) => {
   try {
-    await assetApi.recordDownload(route.params.id as string, detail.value!.currentVersion?.id)
-    // 更新本地显示的下载次数
-    if (asset.value) {
-      asset.value.downloadCount = (asset.value.downloadCount || 0) + 1
+    const response = await fetch(url, { credentials: 'include' })
+    if (!response.ok) throw new Error('附件下载失败，请稍后重试')
+    const blob = await response.blob()
+    if (currentVersion.value?.status === 'PUBLISHED' && !asset.value?.archived) {
+      await assetApi.recordDownload(route.params.id as string, currentVersion.value.id)
+      if (asset.value) asset.value.downloadCount = (asset.value.downloadCount || 0) + 1
     }
-  } catch (err) {
-    console.error('Failed to record download:', err)
+    const objectUrl = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = objectUrl
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
+  } catch (err: any) {
+    await alert({ message: err.message || '下载失败', type: 'error' })
   }
-
-  // 触发下载
-  const url = getDownloadUrl(file)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = file.relativePath
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
 }
 
-const downloadAllFiles = async () => {
-  if (!detail.value?.files || detail.value.files.length === 0) return
+const downloadSingleFile = (file: AssetFile) => downloadAttachment(
+  assetApi.downloadFile(route.params.id as string, file.id), file.relativePath
+)
 
-  // 记录下载次数
-  try {
-    await assetApi.recordDownload(route.params.id as string, detail.value.currentVersion?.id)
-    // 更新本地显示的下载次数
-    if (asset.value) {
-      asset.value.downloadCount = (asset.value.downloadCount || 0) + 1
-    }
-  } catch (err) {
-    console.error('Failed to record download:', err)
-  }
-
-  // 触发 ZIP 打包下载
-  const url = assetApi.downloadAllFiles(route.params.id as string, detail.value.currentVersion?.id)
-  const link = document.createElement('a')
-  link.href = url
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-}
+const downloadAllFiles = () => downloadAttachment(
+  assetApi.downloadAllFiles(route.params.id as string, currentVersion.value?.id),
+  `${asset.value?.slug}-v${currentVersion.value?.versionNo}.zip`
+)
 
 const closeUploadDialog = () => {
+  if (uploading.value) return
   showUploadDialog.value = false
   selectedFiles.value = []
   uploadError.value = ''
@@ -929,8 +798,8 @@ const getScopeLabel = (scope: AssetScope) => {
 const getStatusLabel = (status: string) => {
   const labels: Record<string, string> = {
     DRAFT: '草稿',
-    PENDING: '待审批',
-    REJECTED: '已拒绝',
+    PENDING: '历史未发布版本',
+    REJECTED: '历史未发布版本',
     PUBLISHED: '已发布',
     DEPRECATED: '已弃用',
     WITHDRAWN: '已撤回'
@@ -955,17 +824,6 @@ const formatDate = (dateStr: string) => {
   return date.toLocaleString('zh-CN')
 }
 
-const formatDateTime = (dateStr?: string) => {
-  if (!dateStr) return '-'
-  const date = new Date(dateStr)
-  return date.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
 </script>
 
 <style scoped>
@@ -1158,7 +1016,7 @@ const formatDateTime = (dateStr?: string) => {
 
 .asset-meta-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr));
   gap: var(--sp-20);
   margin-bottom: var(--sp-20);
 }
@@ -1280,6 +1138,7 @@ const formatDateTime = (dateStr?: string) => {
 
 .version-select {
   flex: 1;
+  min-width: 0;
   max-width: 400px;
   height: 36px;
   padding: 0 var(--sp-12);
@@ -1594,46 +1453,6 @@ const formatDateTime = (dateStr?: string) => {
   flex-shrink: 0;
 }
 
-.approval-info {
-  background: var(--color-bg-2);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-12);
-  padding: var(--sp-20);
-  margin-bottom: var(--sp-20);
-}
-
-.info-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  padding: var(--sp-12) 0;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.info-row:last-child {
-  border-bottom: none;
-  flex-direction: column;
-  gap: var(--sp-4);
-}
-
-.info-label {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--color-text-secondary);
-}
-
-.info-value {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
-
-.info-hint {
-  font-size: 13px;
-  color: var(--color-text-tertiary);
-  font-style: italic;
-}
-
 .form-textarea {
   width: 100%;
   padding: var(--sp-12) var(--sp-16);
@@ -1652,86 +1471,6 @@ const formatDateTime = (dateStr?: string) => {
 .form-textarea:focus {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(27, 170, 127, 0.1);
-}
-
-.approval-section {
-  background: var(--color-bg-1);
-  border-radius: var(--radius-12);
-  padding: var(--sp-24);
-  border: 1px solid var(--color-border);
-}
-
-.approval-flow {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-24);
-  margin-top: var(--sp-20);
-}
-
-.flow-item {
-  display: flex;
-  gap: var(--sp-16);
-  flex: 1;
-}
-
-.flow-status {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.flow-status svg {
-  width: 24px;
-  height: 24px;
-}
-
-.flow-completed {
-  background: #D1FAE5;
-  color: #059669;
-}
-
-.flow-pending {
-  background: #FEF3C7;
-  color: #D97706;
-}
-
-.flow-content {
-  flex: 1;
-}
-
-.flow-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--color-text-primary);
-  margin-bottom: var(--sp-4);
-}
-
-.flow-meta {
-  font-size: 13px;
-  color: var(--color-text-secondary);
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-4);
-}
-
-.flow-time {
-  font-size: 12px;
-  color: var(--color-text-tertiary);
-}
-
-.flow-waiting {
-  color: #D97706;
-  font-weight: 500;
-}
-
-.flow-arrow {
-  font-size: 24px;
-  color: var(--color-border);
-  flex-shrink: 0;
 }
 
 /* 编辑器标签页 */
@@ -2151,5 +1890,32 @@ const formatDateTime = (dateStr?: string) => {
   font-size: 13px;
   color: var(--color-text-secondary);
   text-align: center;
+}
+@media (max-width: 680px) {
+  .version-selector { flex-wrap: wrap; }
+  .version-select { flex-basis: 100%; width: 100%; }
+  .page-header, .header-actions, .section-header, .section-actions, .files-header, .timeline-header { flex-wrap: wrap; gap: 10px; }
+  .header-actions { width: 100%; }
+  .header-actions button { padding: 0 12px; white-space: nowrap; }
+  .asset-header { gap: 12px; }
+  .asset-header > div { min-width: 0; }
+  .asset-type-icon { width: 40px; height: 40px; flex-shrink: 0; font-size: 22px; }
+  .asset-title { font-size: 22px; overflow-wrap: anywhere; }
+  .asset-summary { font-size: 14px; overflow-wrap: anywhere; }
+  .asset-info, .body-section, .files-section, .versions-section { padding: 16px; }
+  .file-item { gap: 8px; padding: 12px; flex-wrap: wrap; }
+  .file-info { min-width: 80px; }
+  .file-actions { margin-left: auto; }
+  .dialog-overlay { padding: 12px; }
+  .dialog { border-radius: 8px; }
+  .dialog-header, .dialog-body { padding: 16px; }
+  .dialog-footer { flex-wrap: wrap; gap: 8px; }
+  .dialog-footer button { padding: 0 12px; flex: 0 0 auto; white-space: nowrap; }
+  .selected-file-item { display: grid; grid-template-columns: minmax(0, 1fr) 24px; gap: 10px; }
+  .selected-file-info { min-width: 0; }
+  .selected-file-path { grid-column: 1 / -1; grid-row: 2; }
+  .selected-file-item .btn-icon-sm { grid-column: 2; grid-row: 1; margin-top: 0; }
+  .editor-tabs { flex-wrap: wrap; }
+  .tab-btn { padding: 10px 12px; }
 }
 </style>

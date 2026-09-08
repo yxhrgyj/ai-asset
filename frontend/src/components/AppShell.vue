@@ -8,7 +8,7 @@ const router = useRouter()
 const ROLE_LABEL = {
   USER: '使用者',
   AUTHOR: '编写者',
-  APPROVER: '审核者',
+  APPROVER: '作者',
   ADMIN: '管理员'
 }
 

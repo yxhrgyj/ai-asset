@@ -80,20 +80,20 @@ function renderCharts() {
     { name: '编码规则', value: stats.value.typeBreakdown.rule },
     { name: '技能包', value: stats.value.typeBreakdown.skill },
     { name: '规范文档', value: stats.value.typeBreakdown.document }
-  ], ['#65D8CE', '#76BFFF', '#EBCB8B']))
+  ], ['#165DFF', '#00B42A', '#722ED1']))
   scopeChart.setOption(chartOption([
     { name: '组织级', value: stats.value.scopeBreakdown.organization },
     { name: '技术栈', value: stats.value.scopeBreakdown.techStack },
     { name: '项目级', value: stats.value.scopeBreakdown.project }
-  ], ['#65D8CE', '#A8B7FF', '#E78D9A']))
+  ], ['#00B42A', '#165DFF', '#722ED1']))
 }
 
 function chartOption(data: Array<{ name: string; value: number }>, colors: string[]): ComposeOption<PieSeriesOption | LegendComponentOption | TooltipComponentOption> {
   return {
     color: colors,
     tooltip: { trigger: 'item', renderMode: 'richText' },
-    legend: { bottom: 0, textStyle: { color: '#EEF3F5' }, formatter: name => `${name}  ${data.find(item => item.name === name)?.value ?? 0}` },
-    series: [{ type: 'pie', radius: ['44%', '70%'], center: ['50%', '43%'], stillShowZeroSum: false, itemStyle: { borderColor: '#111617', borderWidth: 4 }, label: { show: false }, data }]
+    legend: { bottom: 0, textStyle: { color: '#475B78' }, formatter: name => `${name}  ${data.find(item => item.name === name)?.value ?? 0}` },
+    series: [{ type: 'pie', radius: ['44%', '70%'], center: ['50%', '43%'], stillShowZeroSum: false, itemStyle: { borderColor: '#FFFFFF', borderWidth: 4 }, label: { show: false }, data }]
   }
 }
 

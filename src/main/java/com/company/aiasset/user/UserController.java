@@ -61,7 +61,7 @@ public class UserController {
         }
 
         String hash = passwordEncoder.encode(req.password());
-        User user = new User(req.username(), req.displayName(), hash, req.role());
+        User user = new User(req.username(), req.displayName(), hash, publishingRole(req.role()));
         user.setTeamId(req.teamId());
         user.setEmail(req.email());
 
@@ -83,7 +83,7 @@ public class UserController {
 
         user.setDisplayName(req.displayName());
         user.setEmail(req.email());
-        user.setRole(req.role());
+        user.setRole(publishingRole(req.role()));
         user.setTeamId(req.teamId());
         user.setStatus(req.status());
 
@@ -104,6 +104,14 @@ public class UserController {
         user.setPasswordHash(hash);
         user.setMustChangePassword(true);
         userRepository.save(user);
+    }
+
+    // Older clients may still send the retired role; it now has author permissions only.
+    private User.Role publishingRole(User.Role role) {
+        if (role == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "请选择用户角色");
+        }
+        return role == User.Role.APPROVER ? User.Role.AUTHOR : role;
     }
 
     public record CreateUserRequest(

@@ -20,7 +20,7 @@ import java.util.UUID;
  * 资产的写操作。读操作简单，直接在控制器里用仓库。
  *
  * 权限模型（v1 从简）：作者及以上可建资产；改与发布限本人或管理员。
- * 第 3 步接入审批流后，publish 会改为提交审批而非直接发布。
+ * 作者直接发布自己的草稿，管理员可代为发布。
  */
 @Service
 public class AssetService {
@@ -28,11 +28,14 @@ public class AssetService {
     private final AssetRepository assets;
     private final AssetVersionRepository versions;
     private final AssetDownloadRepository downloads;
+    private final AssetFileRepository files;
 
-    public AssetService(AssetRepository assets, AssetVersionRepository versions, AssetDownloadRepository downloads) {
+    public AssetService(AssetRepository assets, AssetVersionRepository versions,
+                        AssetDownloadRepository downloads, AssetFileRepository files) {
         this.assets = assets;
         this.versions = versions;
         this.downloads = downloads;
+        this.files = files;
     }
 
     public record CreateRequest(Asset.Type type,
@@ -117,21 +120,27 @@ public class AssetService {
     }
 
     /**
-     * 发布当前草稿。content_hash 由发布时刻的正文算出，
+     * 发布当前草稿。content_hash 覆盖正文与附件清单，
      * asset_versions_published_needs_hash 要求它非空。
      */
     @Transactional
     public AssetVersion publish(UUID assetId, CurrentUser current) {
         Asset a = mustFind(assetId);
         requireOwnerOrAdmin(a, current);
+        if (a.isArchived()) throw bad("请先恢复归档资产，再发布新版本");
 
         AssetVersion v = versions.findOpenVersion(assetId)
                 .orElseThrow(() -> bad("没有待发布的草稿"));
-        if (v.getBody() == null || v.getBody().isBlank()) {
-            throw bad("正文为空，不能发布");
+        List<AssetFile> attachments = files.findByAssetVersionIdOrderByRelativePath(v.getId());
+        if ((v.getBody() == null || v.getBody().isBlank()) && attachments.isEmpty()) {
+            throw bad("请先保存正文或上传附件，再发布资产");
         }
         v.setStatus(AssetVersion.Status.PUBLISHED);
-        v.setContentHash(sha256(v.getBody()));
+        StringBuilder content = new StringBuilder(v.getBody() == null ? "" : v.getBody());
+        for (AssetFile file : attachments) {
+            content.append('\0').append(file.getRelativePath()).append('\0').append(file.getContentHash());
+        }
+        v.setContentHash(sha256(content.toString()));
         v.setPublishedAt(Instant.now());
         return v;
     }
@@ -157,7 +166,19 @@ public class AssetService {
         v.setStatus(AssetVersion.Status.DRAFT);
         v.setBody(latest.getBody());
         v.setCreatedBy(current.user().getId());
-        return versions.save(v);
+        versions.saveAndFlush(v);
+        for (AssetFile original : files.findByAssetVersionIdOrderByRelativePath(latest.getId())) {
+            AssetFile copy = new AssetFile();
+            copy.setAssetVersionId(v.getId());
+            copy.setRelativePath(original.getRelativePath());
+            copy.setSizeBytes(original.getSizeBytes());
+            copy.setContentHash(original.getContentHash());
+            copy.setStorageKey(original.getStorageKey());
+            copy.setTextContent(original.getTextContent());
+            copy.setMimeType(original.getMimeType());
+            files.save(copy);
+        }
+        return v;
     }
 
     /** 归档而非删除：已被下载引用的资产物理删除会让追溯断链。 */
@@ -174,11 +195,16 @@ public class AssetService {
     @Transactional
     public void recordDownload(UUID assetId, UUID versionId, CurrentUser current) {
         Asset a = mustFind(assetId);
+        AssetVersion version = versionId == null
+                ? versions.findLatestPublished(assetId).orElseThrow(() -> bad("没有可下载的已发布版本"))
+                : versions.findById(versionId).orElseThrow(() -> bad("版本不存在"));
+        requireReadableVersion(a, version, current);
+        if (a.isArchived() || version.getStatus() != AssetVersion.Status.PUBLISHED) return;
         a.setDownloadCount(a.getDownloadCount() + 1);
 
         AssetDownload record = new AssetDownload();
         record.setAssetId(assetId);
-        record.setVersionId(versionId);
+        record.setVersionId(version.getId());
         record.setUserId(current.user().getId());
         downloads.save(record);
     }
@@ -190,6 +216,15 @@ public class AssetService {
 
     public List<AssetVersion> versionsOf(UUID assetId) {
         return versions.findByAssetIdOrderByVersionNoDesc(assetId);
+    }
+
+    void requireReadableVersion(Asset asset, AssetVersion version, CurrentUser current) {
+        if (!version.getAssetId().equals(asset.getId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "版本不存在");
+        }
+        if (asset.isArchived() || version.getStatus() != AssetVersion.Status.PUBLISHED) {
+            requireOwnerOrAdmin(asset, current);
+        }
     }
 
     void requireOwnerOrAdmin(Asset a, CurrentUser current) {

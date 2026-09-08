@@ -41,7 +41,7 @@
 
 <script setup lang="ts">
 import { computed, ref, onBeforeUnmount } from 'vue'
-import { LayoutDashboard, Library, FolderKanban, Users, ClipboardCheck, UserRoundCog, PanelLeftOpen, PanelLeftClose, ExternalLink } from '@lucide/vue'
+import { LayoutDashboard, Library, FolderKanban, Users, UserRoundCog, PanelLeftOpen, PanelLeftClose, ExternalLink } from '@lucide/vue'
 import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 
@@ -90,7 +90,6 @@ const navItems = computed(() => [
   { to: '/admin/assets', label: '资产库', icon: Library },
   { to: '/admin/projects', label: '项目管理', icon: FolderKanban },
   { to: '/admin/teams', label: '团队管理', icon: Users },
-  ...(auth.canApprove() ? [{ to: '/admin/approvals', label: '审批管理', icon: ClipboardCheck }] : []),
   ...(auth.isAdmin() ? [{ to: '/admin/users', label: '用户管理', icon: UserRoundCog }] : [])
 ])
 
